@@ -1,5 +1,5 @@
 ﻿# Pijacai
-
+:)
 Pijacai je spletni sistem za vodenje proizvodnih šarž v manjši polnilnici pijač. Omogoča načrtovanje proizvodnih nalogov, evidentiranje surovin in njihove porabe, kontrolo kakovosti ter sledljivost med serijami surovin in končnimi šaržami.
 
 ## Tehnologije
