@@ -12,10 +12,10 @@ Rešitev ima klasično troplastno zasnovo z ločenim frontendom in backendom:
 
 ```mermaid
 flowchart LR
-    U[Uporabnik v brskalniku] --> F[Frontend: React SPA]
-    F -- "HTTP / JSON (REST), JWT v glavi" --> B[Backend: FastAPI]
-    B -- "SQL (SQLAlchemy)*" --> D[(PostgreSQL)]
-    B -. "migracije (Alembic)*" .-> D
+    U[Uporabnik v brskalniku] --> F[React SPA]
+    F -- "HTTPS, JSON, REST" --> B[FastAPI: modularni monolit]
+    B -- "SQL / SQLAlchemy" --> D[(PostgreSQL)]
+    B -. "Alembic migracije" .-> D
 ```
 *SQLAlchemy (Python) omogoča delo s podatki in tabelami v podatkovni bazi.
 
@@ -114,32 +114,16 @@ pijacai/
 
 ## 3. Arhitekturne odločitve
 
-**Ločen frontend in backend (SPA + REST API), ne monolit.**
-Naloga zahteva klasično ločitev, vendar ima pristop tudi praktične prednosti: API je neodvisen od vmesnika, kar omogoča kasnejšo mobilno obliko za operaterje (PWA) ali drug odjemalec. Cena je dodatna kompleksnost (CORS, avtentikacija prek API-ja), ki je obvladljiva.
+| ADR | Odločitev | 
+|---|---|
+| [0001](adr/0001-spletna-arhitektura.md) | Ločen SPA in REST API; backend kot modularni monolit 
+| [0002](adr/0002-relacijska-baza-in-sledljivost.md) | PostgreSQL in relacijski model sledljivosti 
+| [0003](adr/0003-verzioniranje-receptur.md) | Različica recepture se pripne proizvodnemu nalogu 
+| [0004](adr/0004-transakcijska-poraba-po-fifo.md) | Transakcijska poraba zaloge po FIFO 
+| [0005](adr/0005-avtentikacija-in-seje.md) | Seja na strežniku za prijavo uporabnikov 
+| [0006](adr/0006-lokalno-okolje-z-docker-compose.md) | Docker Compose za lokalno razvojno okolje 
 
-**PostgreSQL namesto dokumentne baze (npr. MongoDB).**
-Podatki so močno povezani (šarža – poraba – serija surovine – dobavitelj) in sledljivost temelji na stikih med tabelami. Poleg tega potrebujemo **transakcije**: zagon šarže spremeni več tabel hkrati in mora biti vse ali nič. Relacijski model z tujimi ključi in omejitvami to naravno podpira.
-
-**Povezava več-na-več prek tabele `batch_consumption`.**
-Če bi surovine shranjevali kot seznam znotraj šarže, sledljivost naprej (katere šarže so prizadete) ne bi bila učinkovita. Ločena tabela omogoča poizvedbi v obe smeri in zapis, koliko točno je bilo porabljeno iz katere serije.
-
-**Poslovna logika v backendu (servisni sloj), ne v frontendu.**
-Pravila, kot sta »šarže ni mogoče sprostiti brez ustreznih meritev« in »zagon šarže odpiše zaloge«, morajo veljati ne glede na odjemalca. Ločen servisni sloj jih naredi tudi preprosto testljive.
-
-**FIFO odpis surovin.**
-Pri hrani in pijači je smiselno najprej porabiti starejše serije. Pravilo je enostavno in dobro razložljivo; zaloge tako ostajajo sveže.
-
-**Verzioniranje receptur in zamrznitev ob nalogu.**
-Če bi se receptura spremenila, bi stare šarže izgubile pomen. S pripetjem verzije na nalog zgodovina ostane pravilna.
-
-**JWT namesto sej na strežniku.**
-Backend ostane brez stanja, kar poenostavi ločitev od frontenda in kasnejše skaliranje. Kompromis: preklic žetona je težji, zato je življenjska doba kratka.
-
-**FastAPI namesto Django ali Express.**
-FastAPI nudi vgrajeno validacijo vhodov in samodejno dokumentacijo API-ja, kar je koristno pri razlagi rešitve razvijalcu, ki pri zasnovi ni sodeloval. Django bi prinesel več vgrajenega (admin), vendar je bolj usmerjen v strežniško upodabljanje strani.
-
-**Docker Compose za lokalni zagon.**
-Zmanjša težave z različnimi okolji; razvijalec potrebuje samo Docker.
+Ko se odločitev spremeni: doda se nova odločitev, stara pa se označi kot nadomeščena.
 
 ## 4. Možnosti nadaljnjega razvoja
 
