@@ -5,6 +5,7 @@ import { RoleHome } from "./RoleHome";
 import { Users } from "./Users";
 import { ReceiveMaterials } from "./ReceiveMaterials";
 import { Stock } from "./Stock";
+import { Orders } from "./Orders";
 
 export function Workspace({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [path, setPath] = useState(readPagePath);
@@ -49,6 +50,7 @@ export function Workspace({ user, onLogout }: { user: User; onLogout: () => void
           {page.path === "/uporabniki" && <Users currentUserId={user.id} onSelfDeactivated={onLogout} />}
           {page.path === "/prejem-surovin" && <ReceiveMaterials />}
           {page.path === "/zaloge" && <Stock />}
+          {page.path === "/nalogi" && <Orders role={user.role} />}
         </section>
       ) : (
         <section aria-labelledby="page-title">
