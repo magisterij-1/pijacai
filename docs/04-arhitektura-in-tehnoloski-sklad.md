@@ -45,6 +45,7 @@ Primeri pomembnejših končnih točk (načrt):
 |---|---|---|
 | `POST /auth/login` | Prijava, vrne JWT | vsi |
 | `POST /material-lots` | Prejem surovine | skladiščnik |
+| `GET /stock` | Pregled serij in zalog, filter po surovini, vključitev porabljenih serij | skladiščnik |
 | `POST /orders` | Nov proizvodni nalog | planer |
 | `POST /orders/{id}/batches` | Zagon šarže (preverjanje zalog, poraba) | operater |
 | `POST /batches/{id}/finish` | Konec polnjenja, v kontrolo | operater |

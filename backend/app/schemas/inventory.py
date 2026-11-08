@@ -50,3 +50,22 @@ class SupplierOption(BaseModel):
 
     id: int
     name: str
+
+
+class StockLotOut(MaterialLotOut):
+    material_name: str
+    material_type: MaterialType
+    unit: str
+    supplier_name: str
+
+
+class StockTotal(BaseModel):
+    material_id: int
+    material_name: str
+    unit: str
+    remaining_qty: Decimal
+
+
+class StockOut(BaseModel):
+    lots: list[StockLotOut]
+    totals: list[StockTotal]

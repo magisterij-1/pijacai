@@ -131,6 +131,7 @@ def test_existing_api_routes_have_an_explicit_access_policy():
         ("GET", "/api/material-lots"),
         ("GET", "/api/lookup/materials"),
         ("GET", "/api/lookup/suppliers"),
+        ("GET", "/api/stock"),
     }
     implemented_routes = {
         (method, route.path)
