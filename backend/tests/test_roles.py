@@ -123,10 +123,11 @@ def test_existing_api_routes_have_an_explicit_access_policy():
     # Ob novi poslovni poti dopolni ta seznam in dodaj vedenjske teste njenih vlog.
     public_routes = {("GET", "/api/health"), ("POST", "/api/auth/login")}
     authenticated_routes = {("GET", "/api/auth/me")}
+    restricted_routes = {("POST", "/api/users")}
     implemented_routes = {
         (method, route.path)
         for route in app.routes
         if isinstance(route, APIRoute) and route.path.startswith("/api/")
         for method in route.methods
     }
-    assert implemented_routes == public_routes | authenticated_routes
+    assert implemented_routes == public_routes | authenticated_routes | restricted_routes
