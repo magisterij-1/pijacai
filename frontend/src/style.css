@@ -76,6 +76,17 @@ button:disabled {
   cursor: wait;
 }
 
+.secondary {
+  background: #e5f2f2;
+  color: #155e63;
+  margin-top: 1rem;
+  margin-right: 0.5rem;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #cfe5e5;
+}
+
 input:focus-visible,
 button:focus-visible,
 h2:focus-visible {
