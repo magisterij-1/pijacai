@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -93,3 +95,22 @@ def orders(user: User = Depends(require_roles(Role.planner, Role.operator)), db:
     if user.role == Role.operator:
         query = query.where(ProductionOrder.status.in_([OrderStatus.planned, OrderStatus.in_progress]))
     return [order_view(order) for order in db.scalars(query).all()]
+
+
+@router.post("/orders/{order_id}/cancel", response_model=OrderOut)
+def cancel_order(
+    order_id: Annotated[int, Path(gt=0, le=2147483647)],
+    user: User = Depends(require_roles(Role.planner)),
+    db: Session = Depends(get_db),
+):
+    order = db.scalar(select(ProductionOrder).where(ProductionOrder.id == order_id).with_for_update())
+    if order is None:
+        raise HTTPException(status_code=404, detail="Proizvodni nalog ni najden.")
+    if order.status == OrderStatus.in_progress:
+        raise HTTPException(status_code=409, detail="Naloga ni mogoče odpovedati, ker je šarža že zagnana.")
+    if order.status != OrderStatus.planned:
+        raise HTTPException(status_code=409, detail="Odpoved je dovoljena samo za načrtovan nalog.")
+    order.status = OrderStatus.cancelled
+    db.commit()
+    db.refresh(order)
+    return order_view(order)

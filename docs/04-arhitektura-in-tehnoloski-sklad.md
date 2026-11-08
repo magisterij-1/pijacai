@@ -50,6 +50,7 @@ Primeri pomembnejših končnih točk (načrt):
 | `POST /orders/preview` | Predogled aktivne recepture in potrebnih količin za nalog | planer |
 | `GET /lookup/products` | Izdelki z aktivno neprazno recepturo za izbor pri nalogu | planer |
 | `GET /orders` | Pregled nalogov; operater vidi načrtovane in tekoče | planer, operater |
+| `POST /orders/{id}/cancel` | Odpoved načrtovanega naloga | planer |
 | `POST /orders/{id}/batches` | Zagon šarže (preverjanje zalog, poraba) | operater |
 | `POST /batches/{id}/finish` | Konec polnjenja, v kontrolo | operater |
 | `POST /batches/{id}/checks` | Vnos meritev | kontrolor |
