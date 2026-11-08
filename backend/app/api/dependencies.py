@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database import get_db
-from app.models import User
+from app.models import Role, User
 
 
 bearer = HTTPBearer(auto_error=False)
@@ -45,3 +45,17 @@ def get_current_session(
 
 def get_current_user(session: AuthenticatedSession = Depends(get_current_session)) -> User:
     return session.user
+
+
+def require_roles(*allowed_roles: Role):
+    """Zahtevaj prijavo in eno od izrecno dovoljenih trenutnih vlog."""
+    if not allowed_roles:
+        raise ValueError("Navesti je treba vsaj eno dovoljeno vlogo.")
+    allowed = frozenset(Role(role) for role in allowed_roles)
+
+    def check_role(user: User = Depends(get_current_user)) -> User:
+        if user.role not in allowed:
+            raise HTTPException(status_code=403, detail="Nimate dostopa.")
+        return user
+
+    return check_role
