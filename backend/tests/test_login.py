@@ -38,7 +38,9 @@ def client(user):
     app.dependency_overrides.clear()
 
 
-def test_successful_login_returns_signed_token_without_password(client):
+@pytest.mark.parametrize("role", list(Role))
+def test_successful_login_returns_signed_token_without_password(client, user, role):
+    user.role = role
     test_client, _ = client
     response = test_client.post("/api/auth/login", json={
         "email": "test@pijacai.local", "password": "TestnoGeslo123!",
@@ -47,18 +49,25 @@ def test_successful_login_returns_signed_token_without_password(client):
     data = response.json()
     payload = jwt.decode(data["access_token"], JWT_SECRET, algorithms=["HS256"])
     assert payload["sub"] == "1"
-    assert payload["role"] == "admin"
+    assert payload["role"] == role.value
+    assert set(payload) == {"sub", "role", "iat", "exp"}
+    assert user.password_hash not in response.text
+    assert "TestnoGeslo123!" not in str(payload)
     assert payload["exp"] - payload["iat"] == 3600
     assert data["expires_in"] == 3600
     assert data["expires_at"] == payload["exp"]
     assert data["token_type"] == "bearer"
     assert data["user"]["email"] == "test@pijacai.local"
+    assert data["user"]["role"] == role.value
     assert "password" not in data["user"]
     assert "password_hash" not in data["user"]
     assert "TestnoGeslo123!" not in response.text
 
 
-@pytest.mark.parametrize("case", ["unknown_email", "wrong_password", "inactive"])
+@pytest.mark.parametrize("case", [
+    "unknown_email", "wrong_password", "inactive", "empty_password",
+    "overlong_password", "invalid_hash",
+])
 def test_invalid_login_returns_same_401(client, user, case):
     test_client, db = client
     password = "TestnoGeslo123!"
@@ -66,13 +75,51 @@ def test_invalid_login_returns_same_401(client, user, case):
         db.scalar.return_value = None
     elif case == "wrong_password":
         password = "NapacnoGeslo"
-    else:
+    elif case == "inactive":
         user.active = False
+    elif case == "empty_password":
+        password = ""
+    elif case == "overlong_password":
+        password = "a" * 73
+    elif case == "invalid_hash":
+        user.password_hash = "invalid-hash"
     response = test_client.post("/api/auth/login", json={
         "email": "test@pijacai.local", "password": password,
     })
     assert response.status_code == 401
     assert response.json() == {"detail": "Napačna e-pošta ali geslo."}
+    assert "access_token" not in response.json()
+
+
+@pytest.mark.parametrize("body", [
+    {"password": "NE_RAZKRIJ_GESLA_123!"},
+    {"email": "test@pijacai.local"},
+    {"email": {"value": "invalid"}, "password": "NE_RAZKRIJ_GESLA_123!"},
+    {"email": "test@pijacai.local", "password": {"value": "NE_RAZKRIJ_GESLA_123!"}},
+    [{"password": "NE_RAZKRIJ_GESLA_123!"}],
+])
+def test_validation_errors_do_not_echo_password_or_request_body(client, body):
+    test_client, db = client
+    response = test_client.post("/api/auth/login", json=body)
+    assert response.status_code == 422
+    assert "NE_RAZKRIJ_GESLA_123!" not in response.text
+    assert response.json()["detail"]
+    for error in response.json()["detail"]:
+        assert set(error) == {"loc", "msg", "type"}
+    db.scalar.assert_not_called()
+
+
+def test_invalid_json_does_not_echo_body(client):
+    test_client, db = client
+    response = test_client.post(
+        "/api/auth/login",
+        content='{"password":"NE_RAZKRIJ_GESLA_123!",',
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 422
+    assert "NE_RAZKRIJ_GESLA_123!" not in response.text
+    assert "input" not in response.json()["detail"][0]
+    db.scalar.assert_not_called()
 
 
 def test_password_is_hashed_and_overlong_password_is_not_truncated():
@@ -112,7 +159,10 @@ def test_me_restores_session_with_current_database_role(client, user):
     db.get.assert_called_once_with(User, 1)
 
 
-@pytest.mark.parametrize("case", ["missing", "invalid", "expired", "bad_signature", "no_exp", "bad_sub", "inactive", "deleted"])
+@pytest.mark.parametrize("case", [
+    "missing", "invalid", "expired", "bad_signature", "no_exp", "bad_sub",
+    "inactive", "deleted", "no_iat", "no_role", "wrong_algorithm", "future_iat",
+])
 def test_me_rejects_invalid_sessions(client, user, case):
     test_client, db = client
     token = signed_token()
@@ -130,6 +180,15 @@ def test_me_rejects_invalid_sessions(client, user, case):
         user.active = False
     elif case == "deleted":
         db.get.return_value = None
+    elif case in ("no_iat", "no_role"):
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        del payload["iat" if case == "no_iat" else "role"]
+        token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    elif case == "wrong_algorithm":
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        token = jwt.encode(payload, JWT_SECRET, algorithm="HS384")
+    elif case == "future_iat":
+        token = signed_token(iat=datetime.now(timezone.utc) + timedelta(minutes=5))
     headers = {} if case == "missing" else {"Authorization": f"Bearer {token}"}
     response = test_client.get("/api/auth/me", headers=headers)
     assert response.status_code == 401
