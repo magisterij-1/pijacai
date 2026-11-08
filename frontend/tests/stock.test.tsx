@@ -131,3 +131,54 @@ it("po hitri spremembi filtra ignorira starejši odgovor", async () => {
   await act(async () => pending[0]({ ...data, totals: [{ ...data.totals[0], remaining_qty: "999.000" }] }));
   expect(container.querySelector("strong")?.textContent).toBe("0,300 kg");
 });
+
+it("pri praznem pregledu vseh surovin ne izmisli skupne vsote", async () => {
+  vi.mocked(getStock).mockResolvedValue({ lots: [], totals: [] });
+  await render();
+  expect(container.textContent).toContain("Ni serij za izbrane pogoje.");
+  expect(container.querySelector("strong")).toBeNull();
+  expect(container.querySelector("table")).toBeNull();
+});
+
+it("ročna osvežitev ohrani filter in vključitev porabljenih serij", async () => {
+  await render();
+  await selectMaterial("10");
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async () => container.querySelector("button")!.click());
+  expect(getStock).toHaveBeenLastCalledWith({ material_id: 10, include_consumed: true }, expect.any(AbortSignal));
+  expect(container.querySelector<HTMLSelectElement>("select")!.value).toBe("10");
+  expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(true);
+});
+
+it("velike decimalne vsote prikaže brez izgube zadnjih tisočink", async () => {
+  vi.mocked(getStock).mockResolvedValue({ ...data, totals: [{ ...data.totals[0], remaining_qty: "9007199254740.993" }] });
+  await render();
+  expect(container.querySelector("strong")?.textContent).toBe("9.007.199.254.740,993 kg");
+});
+
+it("napako šifranta prikaže ločeno od uspešno naložene zaloge", async () => {
+  vi.mocked(listMaterials).mockRejectedValueOnce(new Error("Šifranta ni mogoče naložiti."));
+  await render();
+  expect(container.textContent).toContain("Šifranta ni mogoče naložiti.");
+  expect(container.querySelectorAll("tbody tr").length).toBe(2);
+  await act(async () => container.querySelector("button")!.click());
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.querySelectorAll("option").length).toBe(3);
+});
+
+it("izbrisana izbrana surovina prikaže napako namesto stare zaloge", async () => {
+  vi.mocked(getStock).mockResolvedValueOnce(data).mockRejectedValueOnce(new Error("Surovina ni najdena."));
+  await render(); await selectMaterial("10");
+  expect(container.textContent).toContain("Surovina ni najdena.");
+  expect(container.querySelector("table")).toBeNull();
+  expect(container.querySelector("strong")).toBeNull();
+});
+
+it("napaka stare zahteve ne prepiše novega uspešnega filtra", async () => {
+  let rejectOld!: (error: Error) => void;
+  vi.mocked(getStock).mockReturnValueOnce(new Promise((_resolve, reject) => { rejectOld = reject; })).mockResolvedValueOnce(data);
+  await render(); await selectMaterial("10");
+  await act(async () => rejectOld(new Error("Zastarela napaka.")));
+  expect(container.textContent).not.toContain("Zastarela napaka.");
+  expect(container.querySelector("strong")?.textContent).toBe("0,300 kg");
+});

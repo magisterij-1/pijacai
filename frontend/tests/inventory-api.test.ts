@@ -128,3 +128,27 @@ it.each([
   expect(request?.cache).toBe("no-store");
   expect(new Headers(request?.headers).get("Authorization")).toBe("Bearer warehouse-token");
 });
+
+it("pregled zalog ob 401 odstrani JWT in sproži odjavo", async () => {
+  respond({ detail: "Prijava ni veljavna." }, 401);
+  const listener = vi.fn();
+  window.addEventListener(unauthorizedEvent, listener);
+  try {
+    await expect(getStock()).rejects.toThrow("Prijava je potekla ali ni veljavna.");
+    expect(readToken()).toBeNull();
+    expect(listener).toHaveBeenCalledOnce();
+  } finally {
+    window.removeEventListener(unauthorizedEvent, listener);
+  }
+});
+
+it("pregled zalog ob 403 ne odjavi veljavnega uporabnika", async () => {
+  respond({ detail: "Nimate dostopa." }, 403);
+  await expect(getStock()).rejects.toThrow("Nimate dostopa.");
+  expect(readToken()).toBe("warehouse-token");
+});
+
+it("pregled zalog za neobstoječo surovino ohrani sporočilo 404", async () => {
+  respond({ detail: "Surovina ni najdena." }, 404);
+  await expect(getStock({ material_id: 999 })).rejects.toThrow("Surovina ni najdena.");
+});

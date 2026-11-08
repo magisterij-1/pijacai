@@ -105,13 +105,15 @@ def test_material_without_lots_has_zero_total(stock_client):
     }]
 
 
-def test_fully_consumed_material_still_has_zero_total_when_selected(stock_client):
+@pytest.mark.parametrize("include_consumed", [False, True])
+def test_fully_consumed_material_still_has_zero_total_when_selected(stock_client, include_consumed):
     client, db, user, a, _, _, _ = stock_client
     for lot in db.scalars(select(MaterialLot).where(MaterialLot.material_id == a.id)):
         lot.remaining_qty = Decimal("0")
     db.flush()
-    result = client.get("/api/stock", params={"material_id": a.id}, headers=headers(user)).json()
-    assert result["lots"] == []
+    result = client.get("/api/stock", params={"material_id": a.id, "include_consumed": str(include_consumed).lower()}, headers=headers(user)).json()
+    assert len(result["lots"]) == (4 if include_consumed else 0)
+    assert all(Decimal(lot["remaining_qty"]) == 0 for lot in result["lots"])
     assert Decimal(result["totals"][0]["remaining_qty"]) == 0
 
 
@@ -160,3 +162,55 @@ def test_stock_rejects_invalid_authentication(stock_client, case):
         absent = User(id=db.scalar(select(func.max(User.id))) + 1, role=Role.warehouse)
         auth = headers(absent)
     assert client.get("/api/stock", headers=auth).status_code == 401
+
+
+def test_partial_consumption_totals_remaining_instead_of_received(stock_client):
+    client, db, user, a, _, _, (late, early, _, _, tie) = stock_client
+    late.remaining_qty = Decimal("0.001")
+    early.remaining_qty = Decimal("0.025")
+    tie.remaining_qty = Decimal("0.150")
+    db.flush()
+    result = client.get("/api/stock", params={"material_id": a.id}, headers=headers(user)).json()
+    assert Decimal(result["totals"][0]["remaining_qty"]) == Decimal("0.176")
+    assert sum(Decimal(lot["remaining_qty"]) for lot in result["lots"]) == Decimal("0.176")
+    assert early.received_qty == Decimal("0.100")
+    assert late.received_qty == Decimal("0.200")
+
+
+def test_materials_with_the_same_unit_are_not_combined(stock_client):
+    client, db, user, a, _, _, (_, early, _, _, _) = stock_client
+    other = Material(name=f"Druga surovina {uuid4().hex}", type=MaterialType.ingredient, unit="kg")
+    db.add(other)
+    db.flush()
+    db.add(MaterialLot(
+        material_id=other.id, supplier_id=early.supplier_id, supplier_lot_no="DRUGA-KG",
+        received_qty=Decimal("12.300"), remaining_qty=Decimal("12.300"), unit_cost=Decimal("1"), received_by=user.id,
+    ))
+    db.flush()
+    totals = {item["material_id"]: Decimal(item["remaining_qty"]) for item in client.get("/api/stock", headers=headers(user)).json()["totals"]}
+    assert totals[a.id] == Decimal("0.600")
+    assert totals[other.id] == Decimal("12.300")
+    filtered = client.get("/api/stock", params={"material_id": a.id}, headers=headers(user)).json()
+    assert all(item["material_id"] == a.id for item in filtered["lots"])
+
+
+def test_reading_stock_does_not_modify_lots(stock_client):
+    client, db, user, a, b, _, lots = stock_client
+    before = {lot.id: (lot.received_qty, lot.remaining_qty, lot.unit_cost, lot.received_at) for lot in lots}
+    for include_consumed in ("false", "true"):
+        assert client.get("/api/stock", params={"include_consumed": include_consumed}, headers=headers(user)).status_code == 200
+    db.expire_all()
+    after = {lot.id: (lot.received_qty, lot.remaining_qty, lot.unit_cost, lot.received_at)
+             for lot in db.scalars(select(MaterialLot).where(MaterialLot.material_id.in_([a.id, b.id])))}
+    assert after == before
+
+
+@pytest.mark.parametrize("include_consumed", ["false", "true"])
+def test_old_warehouse_token_cannot_read_stock_after_role_change(stock_client, include_consumed):
+    client, db, user, *_ = stock_client
+    auth = headers(user)
+    user.role = Role.quality
+    db.flush()
+    response = client.get("/api/stock", params={"include_consumed": include_consumed}, headers=auth)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Nimate dostopa."}
