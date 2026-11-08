@@ -8,6 +8,9 @@ import type { Order, OrderPreview } from "../src/api/orders";
 import { Orders } from "../src/pages/Orders";
 import { formatDecimal } from "../src/quantities";
 
+// Zagon šarže ima svoje komponentne teste; tukaj preverjamo proizvodne naloge.
+vi.mock("../src/pages/StartBatch", () => ({ StartBatch: () => null }));
+
 vi.mock("../src/api/orders", async importOriginal => {
   const actual = await importOriginal<typeof import("../src/api/orders")>();
   return { ...actual, cancelOrder: vi.fn(), createOrder: vi.fn(), listOrders: vi.fn(), listProducts: vi.fn(), previewOrder: vi.fn() };
@@ -103,7 +106,7 @@ it("ustvari nalog s predogledano recepturo in osveži seznam", async () => {
   expect(table.querySelector("tbody")!.children.length).toBe(2);
 });
 
-it("operaterju prikaže seznam brez obrazca in brez branja izdelkov", async () => {
+it("operaterju prikaže seznam brez obrazca za ustvarjanje naloga in brez branja izdelkov", async () => {
   await render("operator");
   expect(container.querySelector("form")).toBeNull();
   expect(listProducts).not.toHaveBeenCalled();

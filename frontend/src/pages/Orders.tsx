@@ -5,6 +5,7 @@ import { cancelOrder, createOrder, listOrders, listProducts, OrderApiError, prev
 import type { Order, OrderFields, OrderPreview, Product, Requirement } from "../api/orders";
 import { businessToday } from "../dates";
 import { formatDecimal } from "../quantities";
+import { StartBatch } from "./StartBatch";
 
 const statusLabels: Record<Order["status"], string> = {
   planned: "Načrtovan", in_progress: "V teku", done: "Zaključen", cancelled: "Odpovedan",
@@ -185,6 +186,7 @@ export function Orders({ role }: { role: Role }) {
 
   return <div className="users-content">
     {role === "planner" && <NewOrder onCreated={() => setRefresh(value => value + 1)} />}
+    {role === "operator" && <StartBatch orders={orders} loadingOrders={loading} onStarted={() => setRefresh(value => value + 1)} />}
     <section aria-labelledby="orders-list-title">
       <div className="workspace-header"><h3 id="orders-list-title">Seznam nalogov</h3>
         <button className="secondary" disabled={loading || cancellingId !== null} onClick={() => setRefresh(value => value + 1)}>Osveži naloge</button>
