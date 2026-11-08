@@ -22,3 +22,23 @@ def postgres_database_url(request):
     if not _postgres_database_url or not _postgres_database_url.startswith("postgresql"):
         pytest.fail("Integracijske teste zaženi v backend kontejnerju z nastavljeno DATABASE_URL.")
     return _postgres_database_url
+
+
+@pytest.fixture
+def inventory_db(postgres_database_url):
+    """Skupna seja za izrecno izbrane teste migriranih PostgreSQL tabel."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    engine = create_engine(postgres_database_url)
+    try:
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            db = Session(bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint")
+            try:
+                yield db
+            finally:
+                db.close()
+                transaction.rollback()
+    finally:
+        engine.dispose()

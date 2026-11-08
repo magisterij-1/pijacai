@@ -2,28 +2,10 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 from app.models import Material, MaterialLot, MaterialType, Role, Supplier, User
-
-
-@pytest.fixture
-def inventory_db(postgres_database_url):
-    """Prave migrirane tabele; vse spremembe vrstic ostanejo v transakciji."""
-    engine = create_engine(postgres_database_url)
-    try:
-        with engine.connect() as connection:
-            transaction = connection.begin()
-            db = Session(bind=connection, join_transaction_mode="create_savepoint")
-            try:
-                yield db
-            finally:
-                db.close()
-                transaction.rollback()
-    finally:
-        engine.dispose()
 
 
 @pytest.fixture
