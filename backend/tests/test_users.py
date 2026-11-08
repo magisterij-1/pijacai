@@ -273,3 +273,27 @@ def test_name_and_email_are_trimmed_but_password_is_preserved(client, user):
     created = db.add.call_args.args[0]
     assert verify_password(password, created.password_hash)
     assert not verify_password(password.strip(), created.password_hash)
+
+
+@pytest.mark.parametrize("method,path", [
+    ("POST", "/api/users"), ("GET", "/api/users"), ("POST", "/api/users/2/deactivate"),
+])
+def test_former_administrator_cannot_use_old_admin_claim(client, user, method, path):
+    test_client, db = client
+    headers = authorization(user)
+    user.role = Role.operator
+    response = test_client.request(method, path, headers=headers, json=request_body() if method == "POST" and path == "/api/users" else None)
+    assert response.status_code == 403
+    db.scalar.assert_not_called()
+    db.scalars.assert_not_called()
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/api/register", "/api/auth/register"])
+def test_public_self_registration_is_not_available(client, path):
+    test_client, db = client
+    response = test_client.post(path, json=request_body())
+    assert response.status_code == 404
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
