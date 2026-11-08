@@ -53,3 +53,7 @@ export function previewOrder(data: OrderPreviewInput, signal?: AbortSignal): Pro
 export function createOrder(data: OrderCreate): Promise<Order> {
   return request("/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 }
+
+export function cancelOrder(id: number): Promise<Order> {
+  return request(`/orders/${id}/cancel`, { method: "POST" });
+}

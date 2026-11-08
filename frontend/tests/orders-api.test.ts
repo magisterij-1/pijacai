@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createOrder, listOrders, listProducts, previewOrder } from "../src/api/orders";
+import { cancelOrder, createOrder, listOrders, listProducts, previewOrder } from "../src/api/orders";
 import { readToken, saveToken, unauthorizedEvent } from "../src/api/auth";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -54,4 +54,19 @@ it("ob 401 odstrani JWT in sproži odjavo", async () => {
   } finally {
     window.removeEventListener(unauthorizedEvent, listener);
   }
+});
+
+it("odpoved pošlje POST na ID naloga z JWT in brez spremembe polj", async () => {
+  respond({ id: 42, status: "cancelled" });
+  await expect(cancelOrder(42)).resolves.toEqual({ id: 42, status: "cancelled" });
+  const [url, options] = fetchMock.mock.calls[0];
+  expect(url).toBe(`${base}/orders/42/cancel`);
+  expect(options?.method).toBe("POST");
+  expect(options?.body).toBeUndefined();
+  expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer planner-token");
+});
+
+it("odpoved ohrani sporočilo in status konflikta API", async () => {
+  respond({ detail: "Naloga ni mogoče odpovedati, ker je šarža že zagnana." }, 409);
+  await expect(cancelOrder(42)).rejects.toMatchObject({ message: "Naloga ni mogoče odpovedati, ker je šarža že zagnana.", status: 409 });
 });
