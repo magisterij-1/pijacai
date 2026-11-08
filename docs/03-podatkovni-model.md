@@ -82,8 +82,8 @@ Kombinacija `material_id`, `supplier_id` in `supplier_lot_no` je enolična. Inde
 | Polje | Tip | Opomba |
 |---|---|---|
 | id | PK | |
-| name | besedilo | npr. »Linija 1« |
-| active | boolean | |
+| name | besedilo | enolično ime, npr. »Linija 1« |
+| active | boolean | privzeto true |
 
 ### production_order
 | Polje | Tip | Opomba |
@@ -105,11 +105,13 @@ Osrednja entiteta sistema.
 | batch_code | besedilo | unikaten, npr. `2026-10-05-L1-01` |
 | order_id | FK → production_order | |
 | line_id | FK → production_line | |
+| production_date | datum | dan kode v časovnem pasu Europe/Ljubljana |
+| sequence_no | celo število | pozitivna zaporedna številka za linijo in dan; trojica line_id, production_date, sequence_no je enolična |
 | operator_id | FK → app_user | |
 | status | enum | in_production, awaiting_qc, released, rejected |
-| planned_qty | število | količina, za katero je bila ob zagonu izračunana poraba surovin |
-| produced_qty | število | |
-| rejected_qty | število | izmet med polnjenjem |
+| planned_qty | numeric(12,3) | pozitivna količina, za katero je bila ob zagonu izračunana poraba surovin |
+| produced_qty | celo število | nenegativno, privzeto 0 |
+| rejected_qty | celo število | nenegativen izmet, največ produced_qty, privzeto 0 |
 | started_at / finished_at | datum in čas | |
 | decided_by | FK → app_user | kontrolor, ki je odločil |
 | decided_at | datum in čas | |
@@ -123,7 +125,9 @@ Vmesna tabela, ki povezuje šaržo s serijami surovin.
 | id | PK | |
 | batch_id | FK → batch | |
 | material_lot_id | FK → material_lot | |
-| qty | število | odpisana količina |
+| qty | numeric(12,3) | pozitivna odpisana količina; par batch_id, material_lot_id je enoličen |
+
+Zagon in FIFO poraba se izvedeta v eni transakciji. Preverjanje in odpis uporabljata iste količine. Če formula za izbrano količino šarže zahteva več kot tri decimalna mesta sestavine, se zagon zavrne, da ne pride do tihega zaokroževanja ali neskladja s shranjeno zalogo. Podrobnosti zagonov so v ADR 0004 in implementacijskem poročilu.
 
 ### quality_parameter
 Zahtevani parametri in meje za izdelek.

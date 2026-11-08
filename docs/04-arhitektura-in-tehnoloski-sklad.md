@@ -52,6 +52,10 @@ Primeri pomembnejših končnih točk (načrt):
 | `GET /orders` | Pregled nalogov; operater vidi načrtovane in tekoče | planer, operater |
 | `POST /orders/{id}/cancel` | Odpoved načrtovanega naloga | planer |
 | `POST /orders/{id}/batches` | Zagon šarže (preverjanje zalog, poraba) | operater |
+| `POST /orders/{id}/batches/preview` | Predogled potrebne in razpoložljive zaloge za šaržo | operater |
+| `GET /lookup/lines` | Aktivne proizvodne linije | operater |
+| `GET /batches` | Pregled šarž z možnostjo filtra po nalogu ali stanju | operater, planer, kontrolor |
+| `GET /batches/{id}` | Podrobnosti šarže z odpisano porabo po serijah | operater, planer, kontrolor |
 | `POST /batches/{id}/finish` | Konec polnjenja, v kontrolo | operater |
 | `POST /batches/{id}/checks` | Vnos meritev | kontrolor |
 | `POST /batches/{id}/release` | Sprostitev šarže | kontrolor |
