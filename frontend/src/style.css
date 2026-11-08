@@ -5,13 +5,17 @@
   line-height: 1.5;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
 }
 
 main {
-  max-width: 42rem;
-  margin: 4rem auto;
+  width: min(30rem, calc(100% - 2rem));
+  margin: 3rem auto;
   padding: 2rem;
   background: white;
   border-radius: 0.75rem;
@@ -19,4 +23,95 @@ main {
 
 h1 {
   margin-top: 0;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+.muted,
+footer {
+  color: #475f69;
+}
+
+form {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+label {
+  font-weight: 600;
+}
+
+input,
+button {
+  font: inherit;
+  min-height: 2.75rem;
+  border-radius: 0.4rem;
+}
+
+input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.6rem;
+  border: 1px solid #82969e;
+}
+
+button {
+  padding: 0.6rem 1rem;
+  border: 0;
+  background: #155e63;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #104a4e;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+input:focus-visible,
+button:focus-visible,
+h2:focus-visible {
+  outline: 3px solid #197e88;
+  outline-offset: 3px;
+}
+
+.error {
+  margin: 0 0 0.5rem;
+  padding: 0.75rem;
+  color: #8c1c21;
+  background: #fff0f0;
+  border: 1px solid #d9a0a3;
+  border-radius: 0.4rem;
+}
+
+.role-badge {
+  display: inline-block;
+  margin-bottom: 0;
+  padding: 0.25rem 0.65rem;
+  background: #e5f2f2;
+  color: #155e63;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+}
+
+footer {
+  border-top: 1px solid #d8e1e5;
+  margin-top: 2rem;
+  padding-top: 0.75rem;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 480px) {
+  main {
+    margin: 1rem auto;
+    padding: 1.25rem;
+  }
 }

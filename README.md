@@ -129,9 +129,30 @@ docker compose exec backend python -m pytest tests -q
 
 Testi uporabljajo nadomestno podatkovno sejo in ne spreminjajo PostgreSQL podatkov. Preverjajo uspešno izdajo in podpis žetona, življenjsko dobo, enotno napako 401, odsotnost gesla v odgovoru, bcrypt in CORS. Namestitev testnih odvisnosti ponoviš, če ponovno ustvariš kontejner in želiš izvajati teste.
 
+### Prijavni obrazec
+
+Odpri `http://localhost:5174` in se prijavi z računom, ustvarjenim z `python -m app.seed`. Obrazec zahteva veljavno obliko e-pošte in vnos gesla. Med pošiljanjem je gumb onemogočen; napačni podatki prikažejo »Napačna e-pošta ali geslo.«, nedosegljiv API pa sporočilo o neuspešni povezavi. Geslo se po poskusu počisti.
+
+Po uspehu se prikaže začetni pogled glede na uporabnikovo vlogo: skladišče, načrtovanje proizvodnje, proizvodnja, kontrola kakovosti ali upravljanje uporabnikov. Ti pogledi so za zdaj osnovni; poslovni obrazci sledijo v pripadajočih Issues.
+
+Prijava se trenutno hrani samo v pomnilniku aplikacije. Po osvežitvi strani se znova prikaže prijavni obrazec. Obnova prijave, odjava in odziv na potek žetona so del naslednje naloge US-01/4. Zaščita API in dostopa do strani po vlogah je del US-02.
+
+Preveri uspešno prijavo, napačno geslo, prazen obrazec in neveljavno obliko e-pošte. Preveri tudi uporabo tipkovnice in prikaz na ozkem zaslonu. Po spremembah ponovno zgradi frontend in preveri TypeScript:
+
+```powershell
+docker compose up --build
+```
+
+V drugem terminalu:
+
+```powershell
+docker compose exec frontend npm run check
+docker compose exec frontend npm run build
+```
+
 ### Trenutni obseg
 
-Pripravljeno je osnovno razvojno okolje, model uporabnika z migracijo ter API za prijavo z JWT (F1, US-01, nalogi 1 in 2). Prijavni obrazec, ravnanje odjemalca ob poteku prijave ter preverjanje uporabnika in vlog na zaščitenih končnih točkah sledijo v naslednjih nalogah. Žeton že vsebuje potek po 60 minutah; preverjanje poteka pri zaščitenih zahtevkih še ni implementirano.
+Pripravljeno je osnovno razvojno okolje, model uporabnika z migracijo, API za prijavo z JWT in prijavni obrazec z začetnimi pogledi po vlogah (F1, US-01, naloge 1–3). Ravnanje odjemalca ob poteku prijave ter preverjanje uporabnika in vlog na zaščitenih končnih točkah sledijo v naslednjih nalogah. Žeton že vsebuje potek po 60 minutah; preverjanje poteka pri zaščitenih zahtevkih še ni implementirano.
 
 ## Dokumentacija
 
