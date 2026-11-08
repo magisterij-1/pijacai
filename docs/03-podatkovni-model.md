@@ -31,8 +31,8 @@ Receptura izdelka. Ima verzije, zato sprememba ne vpliva na že izdelane šarže
 | id | PK | |
 | product_id | FK → product | |
 | version | celo število | unikatna kombinacija (product_id, version) |
-| output_qty | število | koliko enot nastane po eni izvedbi receptur |
-| active | boolean | samo ena aktivna verzija na izdelek |
+| output_qty | numeric(12,3) | pozitivna količina enot, ki nastane po eni izvedbi recepture |
+| active | boolean | privzeto false; delni enolični indeks dovoljuje največ eno aktivno verzijo na izdelek |
 
 ### recipe_item
 | Polje | Tip | Opomba |
@@ -40,7 +40,7 @@ Receptura izdelka. Ima verzije, zato sprememba ne vpliva na že izdelane šarže
 | id | PK | |
 | recipe_id | FK → recipe | |
 | material_id | FK → material | |
-| qty | število | količina surovine na `output_qty` enot |
+| qty | numeric(12,3) | pozitivna količina surovine na `output_qty` enot; surovina se v isti verziji ne ponovi |
 
 ### material
 Surovina ali embalaža.
@@ -91,7 +91,7 @@ Kombinacija `material_id`, `supplier_id` in `supplier_lot_no` je enolična. Inde
 | id | PK | |
 | product_id | FK → product | |
 | recipe_id | FK → recipe | zamrznjena verzija ob nastanku naloga |
-| planned_qty | število | |
+| planned_qty | celo število | pozitivna načrtovana količina, največ 2147483647 |
 | planned_date | datum | |
 | status | enum | planned, in_progress, done, cancelled |
 | created_by | FK → app_user | |
@@ -214,7 +214,7 @@ erDiagram
         int id PK
         int product_id FK
         int recipe_id FK
-        decimal planned_qty
+        int planned_qty
         string status
     }
     BATCH {
