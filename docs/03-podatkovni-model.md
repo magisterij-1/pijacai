@@ -51,7 +51,15 @@ Surovina ali embalaža.
 | name | besedilo | npr. »Sadni koncentrat«, »Zamašek 38 mm« |
 | type | enum | ingredient, packaging |
 | unit | besedilo | kg, L, kos |
-| min_stock | število | prag za opozorilo |
+| min_stock | numeric(12,3) | nenegativen prag za opozorilo, privzeto 0 |
+
+### supplier
+Dobavitelj surovine ali embalaže. Ločen model omogoča enolično identifikacijo istega dobavitelja pri več prejemih, skladno z nalogo US-04/1.
+
+| Polje | Tip | Opomba |
+|---|---|---|
+| id | PK | |
+| name | besedilo | enolično ime dobavitelja, največ 120 znakov |
 
 ### material_lot
 Posamezen prejem (serija) surovine.
@@ -60,13 +68,15 @@ Posamezen prejem (serija) surovine.
 |---|---|---|
 | id | PK | |
 | material_id | FK → material | |
-| supplier | besedilo | |
+| supplier_id | FK → supplier | dobavitelj prejete serije |
 | supplier_lot_no | besedilo | dobaviteljeva številka serije |
-| received_qty | število | |
-| remaining_qty | število | ne sme biti negativen |
-| unit_cost | število | za izračun stroška |
-| received_at | datum in čas | podlaga za FIFO |
+| received_qty | numeric(12,3) | večja od 0 |
+| remaining_qty | numeric(12,3) | med 0 in received_qty |
+| unit_cost | numeric(12,3) | nenegativna cena za izračun stroška |
+| received_at | datum in čas s časovnim pasom | privzeto trenutni čas, podlaga za FIFO |
 | received_by | FK → app_user | |
+
+Kombinacija `material_id`, `supplier_id` in `supplier_lot_no` je enolična. Indeks `(material_id, received_at, id)` podpira poznejšo FIFO porabo; ID razreši enak čas prejema. Tuji ključi preprečujejo brisanje surovine, dobavitelja ali uporabnika, na katerega se sklicuje serija. Ob prejemu bo API nastavil `remaining_qty = received_qty` in `received_by` na prijavljenega skladiščnika (US-04/2).
 
 ### production_line
 | Polje | Tip | Opomba |
@@ -143,6 +153,7 @@ Zahtevani parametri in meje za izdelek.
 
 - **product 1 : N recipe**, **recipe 1 : N recipe_item**, **material 1 : N recipe_item** (receptura vsebuje več surovin).
 - **material 1 : N material_lot** (surovina se prejema v več serijah).
+- **supplier 1 : N material_lot** (dobavitelj dobavi več serij).
 - **product 1 : N production_order**; **production_order 1 : N batch** (en nalog se lahko izvede v več šaržah).
 - **production_line 1 : N batch**.
 - **batch N : M material_lot** prek **batch_consumption** (šarža porabi več serij, serija se uporabi v več šaržah). To je ključna povezava za sledljivost.
@@ -182,9 +193,14 @@ erDiagram
         string type
         decimal min_stock
     }
+    SUPPLIER {
+        int id PK
+        string name
+    }
     MATERIAL_LOT {
         int id PK
         int material_id FK
+        int supplier_id FK
         string supplier_lot_no
         decimal remaining_qty
         decimal unit_cost
@@ -236,6 +252,8 @@ erDiagram
     RECIPE ||--|{ RECIPE_ITEM : "vsebuje"
     MATERIAL ||--o{ RECIPE_ITEM : "nastopa v"
     MATERIAL ||--o{ MATERIAL_LOT : "prejem"
+    SUPPLIER ||--o{ MATERIAL_LOT : "dobavi"
+    APP_USER ||--o{ MATERIAL_LOT : "evidentira"
     PRODUCT ||--o{ PRODUCTION_ORDER : "se proizvaja"
     RECIPE ||--o{ PRODUCTION_ORDER : "po recepturi"
     PRODUCTION_ORDER ||--o{ BATCH : "razdeljen na"

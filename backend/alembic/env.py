@@ -1,7 +1,7 @@
 from alembic import context
 
 from app.database import Base, engine
-from app.models import User  # noqa: F401 - registracija modela v Base.metadata
+import app.models  # registracija vseh modelov v Base.metadata
 
 
 target_metadata = Base.metadata
