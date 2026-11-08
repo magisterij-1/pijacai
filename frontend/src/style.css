@@ -25,6 +25,52 @@ h1 {
   margin-top: 0;
 }
 
+main.workspace {
+  width: min(60rem, calc(100% - 2rem));
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workspace-header .secondary {
+  margin: 0;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #d8e1e5;
+}
+
+a {
+  color: #155e63;
+}
+
+nav a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.4rem;
+  text-decoration: none;
+  min-height: 2.75rem;
+}
+
+nav a:hover {
+  background: #e5f2f2;
+}
+
+nav a[aria-current="page"] {
+  background: #155e63;
+  color: white;
+}
+
 h2 {
   margin-bottom: 0.5rem;
 }
@@ -89,6 +135,7 @@ button.secondary:hover:not(:disabled) {
 
 input:focus-visible,
 button:focus-visible,
+a:focus-visible,
 h2:focus-visible {
   outline: 3px solid #197e88;
   outline-offset: 3px;

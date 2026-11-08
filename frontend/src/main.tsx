@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { LoginResult } from "./api/auth";
 import { clearToken, readToken, restoreSession, saveToken, unauthorizedEvent } from "./api/auth";
 import { Login } from "./pages/Login";
-import { RoleHome } from "./pages/RoleHome";
+import { Workspace } from "./pages/Workspace";
 import "./style.css";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
@@ -18,6 +18,7 @@ function App() {
 
   function logout(message = "Odjava je uspela.") {
     clearToken();
+    window.location.hash = "/";
     setSession(null);
     setRestoreError("");
     setRestoring(false);
@@ -26,6 +27,7 @@ function App() {
 
   function completeLogin(result: LoginResult) {
     saveToken(result.access_token);
+    window.location.hash = "/";
     setNotice("");
     setSession(result);
   }
@@ -92,7 +94,7 @@ function App() {
   }, []);
 
   return (
-    <main>
+    <main className={session ? "workspace" : undefined}>
       <h1>Pijacai</h1>
       <p>Sistem za vodenje proizvodnih šarž.</p>
       {notice && <p role="status">{notice}</p>}
@@ -103,10 +105,7 @@ function App() {
           <button className="secondary" onClick={() => logout()}>Nazaj na prijavo</button>
         </section>
       ) : session ? (
-        <>
-          <RoleHome user={session.user} />
-          <button className="secondary" onClick={() => logout()}>Odjava</button>
-        </>
+        <Workspace user={session.user} onLogout={() => logout()} />
       ) : <Login onLogin={completeLogin} />}
       <footer><p role="status">{status}</p></footer>
     </main>
