@@ -68,7 +68,8 @@ def test_warehouse_receives_material_or_packaging_in_postgres(receipt_client, ma
 
 @pytest.mark.parametrize("role", list(Role))
 @pytest.mark.parametrize("method,path", [
-    ("POST", "/api/material-lots"), ("GET", "/api/lookup/materials"), ("GET", "/api/lookup/suppliers"),
+    ("POST", "/api/material-lots"), ("GET", "/api/material-lots"),
+    ("GET", "/api/lookup/materials"), ("GET", "/api/lookup/suppliers"),
 ])
 def test_receipt_routes_allow_only_warehouse(receipt_client, role, method, path):
     client, db, user, material, supplier = receipt_client
@@ -81,7 +82,8 @@ def test_receipt_routes_allow_only_warehouse(receipt_client, role, method, path)
 
 @pytest.mark.parametrize("case", ["missing", "invalid", "expired", "inactive", "deleted"])
 @pytest.mark.parametrize("method,path", [
-    ("POST", "/api/material-lots"), ("GET", "/api/lookup/materials"), ("GET", "/api/lookup/suppliers"),
+    ("POST", "/api/material-lots"), ("GET", "/api/material-lots"),
+    ("GET", "/api/lookup/materials"), ("GET", "/api/lookup/suppliers"),
 ])
 def test_receipt_routes_require_valid_active_login(receipt_client, case, method, path):
     client, db, user, material, supplier = receipt_client
@@ -166,6 +168,17 @@ def test_zero_unit_cost_is_allowed(receipt_client):
     response = client.post("/api/material-lots", headers=headers(user), json=body(material, supplier, unit_cost="0"))
     assert response.status_code == 201
     assert Decimal(response.json()["unit_cost"]) == 0
+
+
+def test_saved_receipt_appears_in_list_with_remaining_stock(receipt_client):
+    client, _, user, material, supplier = receipt_client
+    created = client.post("/api/material-lots", headers=headers(user), json=body(material, supplier))
+    assert created.status_code == 201
+    result = client.get("/api/material-lots", headers=headers(user))
+    assert result.status_code == 200
+    matching = [item for item in result.json() if item["id"] == created.json()["id"]]
+    assert len(matching) == 1
+    assert Decimal(matching[0]["remaining_qty"]) == Decimal("10.125")
 
 
 def test_lookup_options_include_real_material_and_supplier(receipt_client):
