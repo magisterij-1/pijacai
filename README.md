@@ -73,9 +73,31 @@ docker compose down
 
 Ukaz `docker compose down` ohrani podatke baze. Sprememba uporabniškega imena ali gesla v `.env` ne spremeni prijavnih podatkov že inicializiranega PostgreSQL volumna.
 
+### Podatkovni model in migracije
+
+Backend pred zagonom API samodejno izvede `alembic upgrade head`. Če migracija ne uspe, se API ne zažene. Obstoječi podatki v volumnu ostanejo ohranjeni.
+
+Prva migracija ustvari tabelo `app_user` s polji `id`, `name`, `email`, `password_hash`, `role`, `active` in `created_at`. E-pošta je enolična, vloga je omejena na `operator`, `quality`, `planner`, `warehouse` in `admin`. Polja so obvezna; aktivnost in čas nastanka imata privzeti vrednosti v bazi. Model vsebuje samo polje za zgoščeno geslo; zgoščevanje in preverjanje gesel sledita pri implementaciji prijave.
+
+Po spremembi modelov in migracij ponovno zgradi in zaženi okolje:
+
+```powershell
+docker compose up --build
+```
+
+V drugem terminalu preveri uporabljeno migracijo in skladnost modelov s podatkovno bazo:
+
+```powershell
+docker compose exec backend alembic current
+docker compose exec backend alembic check
+docker compose exec db psql -U pijacai -d pijacai -c '\d app_user'
+```
+
+Pričakovana revizija je `0001_create_app_user (head)`, `alembic check` pa ne sme zaznati novih operacij za migracijo. Ukaz `psql` uporablja uporabnika in bazo iz `.env.example`; če si ju spremenil, prilagodi argumenta `-U` in `-d`. Tabela je za zdaj prazna; dodajanje uporabnikov in prijava sledita v naslednjih nalogah.
+
 ### Trenutni obseg
 
-Pripravljeno je osnovno razvojno okolje s preverjanjem povezave frontend → API → PostgreSQL. MVP funkcionalnosti F1–F7 se bodo dodajale postopoma. SQLAlchemy se uporablja za dostop do baze; Alembic je dodan med odvisnosti, konfiguracija migracij in prva migracija pa sledita ob pripravi modela uporabnika.
+Pripravljeno je osnovno razvojno okolje s preverjanjem povezave frontend → API → PostgreSQL ter model uporabnika s prvo Alembic migracijo (F1, US-01, naloga 1). Preostale MVP funkcionalnosti F1–F7 se bodo dodajale postopoma.
 
 ## Dokumentacija
 
