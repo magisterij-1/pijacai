@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 os.environ["DATABASE_URL"] = "postgresql+psycopg://test:test@localhost/test"
@@ -26,6 +27,7 @@ def user():
 def client(user):
     db = Mock()
     db.scalar.return_value = user
+    db.get.return_value = user
 
     def override_db():
         yield db
@@ -48,6 +50,7 @@ def test_successful_login_returns_signed_token_without_password(client):
     assert payload["role"] == "admin"
     assert payload["exp"] - payload["iat"] == 3600
     assert data["expires_in"] == 3600
+    assert data["expires_at"] == payload["exp"]
     assert data["token_type"] == "bearer"
     assert data["user"]["email"] == "test@pijacai.local"
     assert "password" not in data["user"]
@@ -88,3 +91,46 @@ def test_login_cors_preflight(client):
     })
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:5174"
+
+
+def signed_token(**claims):
+    now = datetime.now(timezone.utc)
+    payload = {"sub": "1", "role": "admin", "iat": now, "exp": now + timedelta(hours=1)}
+    payload.update(claims)
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+def test_me_restores_session_with_current_database_role(client, user):
+    test_client, db = client
+    token = signed_token()
+    user.role = Role.planner
+    response = test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    assert response.json()["user"]["role"] == "planner"
+    assert "password_hash" not in response.json()["user"]
+    assert response.json()["expires_at"] == jwt.decode(token, JWT_SECRET, algorithms=["HS256"])["exp"]
+    db.get.assert_called_once_with(User, 1)
+
+
+@pytest.mark.parametrize("case", ["missing", "invalid", "expired", "bad_signature", "no_exp", "bad_sub", "inactive", "deleted"])
+def test_me_rejects_invalid_sessions(client, user, case):
+    test_client, db = client
+    token = signed_token()
+    if case == "invalid":
+        token = "invalid-token"
+    elif case == "expired":
+        token = signed_token(exp=datetime.now(timezone.utc) - timedelta(seconds=1))
+    elif case == "bad_signature":
+        token = jwt.encode({"sub": "1"}, "another-signing-key-at-least-32-bytes", algorithm="HS256")
+    elif case == "no_exp":
+        token = jwt.encode({"sub": "1", "role": "admin", "iat": 1}, JWT_SECRET, algorithm="HS256")
+    elif case == "bad_sub":
+        token = signed_token(sub="not-an-id")
+    elif case == "inactive":
+        user.active = False
+    elif case == "deleted":
+        db.get.return_value = None
+    headers = {} if case == "missing" else {"Authorization": f"Bearer {token}"}
+    response = test_client.get("/api/auth/me", headers=headers)
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"

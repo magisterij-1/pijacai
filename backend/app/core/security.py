@@ -14,6 +14,15 @@ if len(JWT_SECRET.encode("utf-8")) < 32:
 TOKEN_LIFETIME_SECONDS = 60 * 60
 
 
+def decode_access_token(token: str) -> dict:
+    return jwt.decode(
+        token,
+        JWT_SECRET,
+        algorithms=["HS256"],
+        options={"require": ["sub", "role", "iat", "exp"]},
+    )
+
+
 def hash_password(password: str) -> str:
     encoded = password.encode("utf-8")
     if len(encoded) > 72:

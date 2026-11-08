@@ -22,4 +22,10 @@ class LoginOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    expires_at: int
     user: UserOut
+
+
+class SessionOut(BaseModel):
+    user: UserOut
+    expires_at: int
