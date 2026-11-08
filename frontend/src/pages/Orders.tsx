@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { Role } from "../api/auth";
-import { createOrder, listOrders, listProducts, OrderApiError, previewOrder } from "../api/orders";
+import { cancelOrder, createOrder, listOrders, listProducts, OrderApiError, previewOrder } from "../api/orders";
 import type { Order, OrderFields, OrderPreview, Product, Requirement } from "../api/orders";
 import { businessToday } from "../dates";
 import { formatDecimal } from "../quantities";
@@ -150,6 +150,28 @@ export function Orders({ role }: { role: Role }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function cancel(order: Order) {
+    if (role !== "planner" || order.status !== "planned" || cancellingId !== null || loading) return;
+    if (!window.confirm(`Odpoveš proizvodni nalog #${order.id} za ${order.product_name}?`)) return;
+    setCancellingId(order.id); setActionError(""); setMessage("");
+    try {
+      const updated = await cancelOrder(order.id);
+      setOrders(current => current.map(item => item.id === updated.id ? updated : item));
+      setMessage(`Proizvodni nalog #${updated.id} je odpovedan.`);
+      setRefresh(value => value + 1);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Odpoved naloga ni uspela.");
+      if (error instanceof OrderApiError && (error.status === 409 || error.status === 404)) {
+        setRefresh(value => value + 1);
+      }
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -165,16 +187,22 @@ export function Orders({ role }: { role: Role }) {
     {role === "planner" && <NewOrder onCreated={() => setRefresh(value => value + 1)} />}
     <section aria-labelledby="orders-list-title">
       <div className="workspace-header"><h3 id="orders-list-title">Seznam nalogov</h3>
-        <button className="secondary" disabled={loading} onClick={() => setRefresh(value => value + 1)}>Osveži naloge</button>
+        <button className="secondary" disabled={loading || cancellingId !== null} onClick={() => setRefresh(value => value + 1)}>Osveži naloge</button>
       </div>
       {loading && <p role="status">Nalaganje nalogov …</p>}
       {error && <p className="error" role="alert">{error}</p>}
+      {actionError && <p className="error" role="alert">{actionError}</p>}
+      {message && <p className="success" role="status">{message}</p>}
       {!loading && !error && (orders.length === 0 ? <p>Ni proizvodnih nalogov za prikaz.</p> : <div className="table-scroll"><table aria-label="Proizvodni nalogi">
-        <thead><tr><th scope="col">Nalog</th><th scope="col">Izdelek</th><th scope="col">Količina</th><th scope="col">Datum</th><th scope="col">Stanje</th><th scope="col">Receptura</th></tr></thead>
+        <thead><tr><th scope="col">Nalog</th><th scope="col">Izdelek</th><th scope="col">Količina</th><th scope="col">Datum</th><th scope="col">Stanje</th><th scope="col">Receptura</th>{role === "planner" && <th scope="col">Akcija</th>}</tr></thead>
         <tbody>{orders.map(order => <tr key={order.id}>
           <td>#{order.id}</td><td>{order.product_name}</td><td>{order.planned_qty.toLocaleString("sl-SI")} {order.product_unit}</td>
           <td>{order.planned_date.split("-").reverse().join(".")}</td><td>{statusLabels[order.status]}</td>
           <td><details><summary>Verzija {order.recipe_version}</summary><Requirements items={order.requirements} /></details></td>
+          {role === "planner" && <td>{order.status === "planned" ? <button className="danger" disabled={cancellingId !== null}
+            aria-label={`Odpovej nalog #${order.id}`} onClick={() => void cancel(order)}>
+            {cancellingId === order.id ? "Odpovedovanje …" : "Odpovej"}
+          </button> : "—"}</td>}
         </tr>)}</tbody>
       </table></div>)}
     </section>

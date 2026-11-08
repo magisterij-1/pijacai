@@ -3,14 +3,14 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createOrder, listOrders, listProducts, OrderApiError, previewOrder } from "../src/api/orders";
+import { cancelOrder, createOrder, listOrders, listProducts, OrderApiError, previewOrder } from "../src/api/orders";
 import type { Order, OrderPreview } from "../src/api/orders";
 import { Orders } from "../src/pages/Orders";
 import { formatDecimal } from "../src/quantities";
 
 vi.mock("../src/api/orders", async importOriginal => {
   const actual = await importOriginal<typeof import("../src/api/orders")>();
-  return { ...actual, createOrder: vi.fn(), listOrders: vi.fn(), listProducts: vi.fn(), previewOrder: vi.fn() };
+  return { ...actual, cancelOrder: vi.fn(), createOrder: vi.fn(), listOrders: vi.fn(), listProducts: vi.fn(), previewOrder: vi.fn() };
 });
 
 const preview: OrderPreview = {
@@ -32,11 +32,13 @@ beforeEach(() => {
   vi.mocked(listOrders).mockReset().mockResolvedValue([existing]);
   vi.mocked(previewOrder).mockReset().mockResolvedValue(preview);
   vi.mocked(createOrder).mockReset().mockResolvedValue({ ...existing, id: 2 });
+  vi.mocked(cancelOrder).mockReset().mockResolvedValue({ ...existing, status: "cancelled" });
+  vi.spyOn(window, "confirm").mockReturnValue(true);
   container = document.createElement("div"); document.body.append(container);
   root = createRoot(container);
 });
 
-afterEach(() => { act(() => root.unmount()); container.remove(); });
+afterEach(() => { act(() => root.unmount()); container.remove(); vi.restoreAllMocks(); });
 
 async function render(role: "planner" | "operator" = "planner") {
   await act(async () => root.render(<Orders role={role} />));
@@ -107,6 +109,8 @@ it("operaterju prikaže seznam brez obrazca in brez branja izdelkov", async () =
   expect(listProducts).not.toHaveBeenCalled();
   expect(container.textContent).toContain("Načrtovan");
   expect(container.textContent).toContain("Verzija 1");
+  expect(container.querySelector('button[aria-label="Odpovej nalog #1"]')).toBeNull();
+  expect(cancelOrder).not.toHaveBeenCalled();
 });
 
 it.each(["0", "1.5"])("zavrne neveljavno celo količino %s", async quantity => {
@@ -158,4 +162,68 @@ it.each([
   ["9007199254740.993", "9.007.199.254.740,993"],
 ])("natančno oblikuje količino %s", (value, expected) => {
   expect(formatDecimal(value)).toBe(expected);
+});
+
+it("po potrditvi odpove nalog in osveži seznam z ohranjeno vrstico", async () => {
+  vi.mocked(listOrders).mockResolvedValueOnce([existing]).mockResolvedValueOnce([{ ...existing, status: "cancelled" }]);
+  await render();
+  await act(async () => button("Odpovej").click());
+  expect(window.confirm).toHaveBeenCalledWith("Odpoveš proizvodni nalog #1 za Jabolčni sok?");
+  expect(cancelOrder).toHaveBeenCalledWith(1);
+  expect(listOrders).toHaveBeenCalledTimes(2);
+  expect(container.textContent).toContain("Proizvodni nalog #1 je odpovedan.");
+  expect(container.textContent).toContain("Odpovedan");
+  expect(container.querySelector('table[aria-label="Proizvodni nalogi"]')).not.toBeNull();
+  expect(container.querySelector('button[aria-label="Odpovej nalog #1"]')).toBeNull();
+});
+
+it("preklic potrditve ne pošlje zahteve za odpoved", async () => {
+  vi.mocked(window.confirm).mockReturnValue(false);
+  await render();
+  await act(async () => button("Odpovej").click());
+  expect(cancelOrder).not.toHaveBeenCalled();
+  expect(listOrders).toHaveBeenCalledTimes(1);
+  expect(container.textContent).toContain("Načrtovan");
+});
+
+it.each(["in_progress", "done", "cancelled"] as const)("nalog v stanju %s nima gumba za odpoved", async status => {
+  vi.mocked(listOrders).mockResolvedValue([{ ...existing, status }]);
+  await render();
+  expect(container.querySelector('button[aria-label="Odpovej nalog #1"]')).toBeNull();
+});
+
+it("konflikt zaradi zagona prikaže in ponovno naloži trenutno stanje", async () => {
+  const message = "Naloga ni mogoče odpovedati, ker je šarža že zagnana.";
+  vi.mocked(cancelOrder).mockRejectedValueOnce(new OrderApiError(message, {}, 409));
+  vi.mocked(listOrders).mockResolvedValueOnce([existing]).mockResolvedValueOnce([{ ...existing, status: "in_progress" }]);
+  await render();
+  await act(async () => button("Odpovej").click());
+  expect(container.textContent).toContain(message);
+  expect(container.textContent).toContain("V teku");
+  expect(container.querySelector('button[aria-label="Odpovej nalog #1"]')).toBeNull();
+  expect(container.querySelector(".success")).toBeNull();
+});
+
+it("ob omrežni napaki ohrani načrtovan nalog in omogoči ponovitev", async () => {
+  vi.mocked(cancelOrder).mockRejectedValueOnce(new Error("Povezava s strežnikom ni uspela."));
+  await render();
+  await act(async () => button("Odpovej").click());
+  expect(container.textContent).toContain("Povezava s strežnikom ni uspela.");
+  expect(button("Odpovej").disabled).toBe(false);
+  expect(container.textContent).toContain("Načrtovan");
+  expect(listOrders).toHaveBeenCalledTimes(1);
+});
+
+it("med odpovedjo prepreči dvojno pošiljanje", async () => {
+  let resolve!: (value: Order) => void;
+  vi.mocked(cancelOrder).mockReturnValueOnce(new Promise<Order>(done => { resolve = done; }));
+  vi.mocked(listOrders).mockResolvedValueOnce([existing]).mockResolvedValueOnce([{ ...existing, status: "cancelled" }]);
+  await render();
+  const cancel = button("Odpovej");
+  await act(async () => cancel.click());
+  expect(cancel.disabled).toBe(true);
+  await act(async () => cancel.click());
+  expect(cancelOrder).toHaveBeenCalledOnce();
+  await act(async () => resolve({ ...existing, status: "cancelled" }));
+  expect(container.textContent).toContain("Odpovedan");
 });
