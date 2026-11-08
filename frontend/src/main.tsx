@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { LoginResult } from "./api/auth";
+import { Login } from "./pages/Login";
+import { RoleHome } from "./pages/RoleHome";
 import "./style.css";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
 
 function App() {
+  const [session, setSession] = useState<LoginResult | null>(null);
   const [status, setStatus] = useState("Preverjanje povezave …");
 
   useEffect(() => {
@@ -32,7 +36,8 @@ function App() {
     <main>
       <h1>Pijacai</h1>
       <p>Sistem za vodenje proizvodnih šarž.</p>
-      <p role="status">{status}</p>
+      {session ? <RoleHome user={session.user} /> : <Login onLogin={setSession} />}
+      <footer><p role="status">{status}</p></footer>
     </main>
   );
 }
