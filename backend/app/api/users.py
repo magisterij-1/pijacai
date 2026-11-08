@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -16,6 +18,30 @@ router = APIRouter(prefix="/api/users", tags=["Uporabniki"])
 
 def duplicate_email() -> HTTPException:
     return HTTPException(status_code=409, detail="Uporabnik s to e-pošto že obstaja.")
+
+
+@router.get("", response_model=list[UserOut])
+def list_users(
+    admin: User = Depends(require_roles(Role.admin)),
+    db: Session = Depends(get_db),
+):
+    return db.scalars(select(User).order_by(User.id)).all()
+
+
+@router.post("/{user_id}/deactivate", response_model=UserOut)
+def deactivate_user(
+    user_id: Annotated[int, Path(gt=0, le=2147483647)],
+    admin: User = Depends(require_roles(Role.admin)),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Uporabnik ni najden.")
+    if user.active:
+        user.active = False
+        db.commit()
+        db.refresh(user)
+    return user
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)

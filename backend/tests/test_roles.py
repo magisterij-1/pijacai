@@ -123,7 +123,11 @@ def test_existing_api_routes_have_an_explicit_access_policy():
     # Ob novi poslovni poti dopolni ta seznam in dodaj vedenjske teste njenih vlog.
     public_routes = {("GET", "/api/health"), ("POST", "/api/auth/login")}
     authenticated_routes = {("GET", "/api/auth/me")}
-    restricted_routes = {("POST", "/api/users")}
+    restricted_routes = {
+        ("POST", "/api/users"),
+        ("GET", "/api/users"),
+        ("POST", "/api/users/{user_id}/deactivate"),
+    }
     implemented_routes = {
         (method, route.path)
         for route in app.routes
