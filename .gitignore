@@ -1,1 +1,25 @@
 ﻿
+# Backend: Python / FastAPI / SQLAlchemy / Alembic
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Backend testi: pytest
+.pytest_cache/
+
+# Frontend: React / Vite / TypeScript (npm)
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+/frontend/**/*.tsbuildinfo
+npm-debug.log*
+
+# Lokalna konfiguracija API, Vite in Docker Compose
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Lokalni zapisi razvojnih nalog
+/m/
