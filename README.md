@@ -77,7 +77,7 @@ Ukaz `docker compose down` ohrani podatke baze. Sprememba uporabniškega imena a
 
 Backend pred zagonom API samodejno izvede `alembic upgrade head`. Če migracija ne uspe, se API ne zažene. Obstoječi podatki v volumnu ostanejo ohranjeni.
 
-Prva migracija ustvari tabelo `app_user` s polji `id`, `name`, `email`, `password_hash`, `role`, `active` in `created_at`. E-pošta je enolična, vloga je omejena na `operator`, `quality`, `planner`, `warehouse` in `admin`. Polja so obvezna; aktivnost in čas nastanka imata privzeti vrednosti v bazi. Model vsebuje samo polje za zgoščeno geslo; zgoščevanje in preverjanje gesel sledita pri implementaciji prijave.
+Prva migracija ustvari tabelo `app_user` s polji `id`, `name`, `email`, `password_hash`, `role`, `active` in `created_at`. E-pošta je enolična, vloga je omejena na `operator`, `quality`, `planner`, `warehouse` in `admin`. Polja so obvezna; aktivnost in čas nastanka imata privzeti vrednosti v bazi. Model vsebuje samo polje za zgoščeno geslo; zgoščevanje in preverjanje gesel sta del implementacije prijave.
 
 Po spremembi modelov in migracij ponovno zgradi in zaženi okolje:
 
@@ -93,11 +93,45 @@ docker compose exec backend alembic check
 docker compose exec db psql -U pijacai -d pijacai -c '\d app_user'
 ```
 
-Pričakovana revizija je `0001_create_app_user (head)`, `alembic check` pa ne sme zaznati novih operacij za migracijo. Ukaz `psql` uporablja uporabnika in bazo iz `.env.example`; če si ju spremenil, prilagodi argumenta `-U` in `-d`. Tabela je za zdaj prazna; dodajanje uporabnikov in prijava sledita v naslednjih nalogah.
+Pričakovana revizija je `0001_create_app_user (head)`, `alembic check` pa ne sme zaznati novih operacij za migracijo. Ukaz `psql` uporablja uporabnika in bazo iz `.env.example`; če si ju spremenil, prilagodi argumenta `-U` in `-d`. Uporabniki se ne ustvarijo samodejno.
+
+### API za prijavo
+
+Odločitev o JWT je zapisana v [ADR 0007](docs/adr/0007-jwt-avtentikacija.md), ki nadomešča [ADR 0005](docs/adr/0005-avtentikacija-in-seje.md). Stari ADR je ohranjen in označen kot nadomeščen. Poti API uporabljajo predpono `/api`; pot `/auth/login` iz zasnove je v aplikaciji dosegljiva kot `/api/auth/login`.
+
+V `.env` dodaj `JWT_SECRET` po vzoru `.env.example`. Ključ mora vsebovati najmanj 32 bajtov; za okolje izven lokalnega razvoja uporabi dolg naključen ključ namesto razvojne vrednosti iz primera. Po spremembi konfiguracije in odvisnosti zaženi `docker compose up --build`.
+
+Pred prvim preizkusom ročno ustvari začetnega administratorja:
+
+```powershell
+docker compose exec backend python -m app.seed
+```
+
+Ukaz vpraša za ime, e-pošto in geslo. Geslo mora imeti najmanj 8 znakov in največ 72 UTF-8 bajtov, pri vnosu se ne izpisuje in se shrani samo kot bcrypt zgoščena vrednost. Ob obstoječi e-pošti ukaz ne spremeni računa. To je lokalni ukaz za začetno postavitev, ne javna registracija ali administratorski API.
+
+V Swagger UI na `http://localhost:8001/docs` odpri `POST /api/auth/login`, izberi **Try it out** in vnesi podatke ustvarjenega uporabnika:
+
+```json
+{
+  "email": "tvoja-vnesena-eposta@example.com",
+  "password": "tvoje-vneseno-geslo"
+}
+```
+
+Uspešna prijava vrne `access_token`, `token_type`, `expires_in` (3600 sekund) in javne podatke uporabnika. Žeton vsebuje `sub`, `role`, `iat` in `exp`. Napačna e-pošta, napačno geslo ali neaktiven uporabnik vrnejo HTTP 401 s sporočilom »Napačna e-pošta ali geslo.« Odgovor ne vsebuje gesla ali njegove zgoščene vrednosti.
+
+Avtomatske teste prijave zaženi v razvojnem kontejnerju:
+
+```powershell
+docker compose exec backend pip install -r requirements-dev.txt
+docker compose exec backend python -m pytest tests -q
+```
+
+Testi uporabljajo nadomestno podatkovno sejo in ne spreminjajo PostgreSQL podatkov. Preverjajo uspešno izdajo in podpis žetona, življenjsko dobo, enotno napako 401, odsotnost gesla v odgovoru, bcrypt in CORS. Namestitev testnih odvisnosti ponoviš, če ponovno ustvariš kontejner in želiš izvajati teste.
 
 ### Trenutni obseg
 
-Pripravljeno je osnovno razvojno okolje s preverjanjem povezave frontend → API → PostgreSQL ter model uporabnika s prvo Alembic migracijo (F1, US-01, naloga 1). Preostale MVP funkcionalnosti F1–F7 se bodo dodajale postopoma.
+Pripravljeno je osnovno razvojno okolje, model uporabnika z migracijo ter API za prijavo z JWT (F1, US-01, nalogi 1 in 2). Prijavni obrazec, ravnanje odjemalca ob poteku prijave ter preverjanje uporabnika in vlog na zaščitenih končnih točkah sledijo v naslednjih nalogah. Žeton že vsebuje potek po 60 minutah; preverjanje poteka pri zaščitenih zahtevkih še ni implementirano.
 
 ## Dokumentacija
 
