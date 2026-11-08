@@ -139,3 +139,41 @@ it("ob neuspešni osvežitvi po uspešnem zapisu ne prijavi neuspešnega shranje
   expect(container.querySelectorAll("tbody tr").length).toBe(2);
   expect(container.querySelector("strong")).toBeNull();
 });
+
+it("pri zalogi ne združuje različnih surovin in merskih enot", async () => {
+  vi.mocked(listMaterialLots).mockResolvedValue([
+    existing, { ...existing, id: 2, material_id: 11, received_qty: "999.000", remaining_qty: "999.000" },
+  ]);
+  await render();
+  fill("material_id", "10");
+  expect(container.querySelector("strong")?.textContent).toBe("0,100 kg");
+  fill("material_id", "11");
+  expect(container.querySelector("strong")?.textContent).toBe("999,000 kos");
+});
+
+it("napako nalaganja odpravi s ponovnim poskusom", async () => {
+  vi.mocked(listMaterials).mockRejectedValueOnce(new Error("Šifranta ni mogoče naložiti."));
+  await render();
+  expect(container.textContent).toContain("Šifranta ni mogoče naložiti.");
+  const refresh = Array.from(container.querySelectorAll("button")).find(item => item.textContent === "Osveži podatke")!;
+  await act(async () => refresh.click());
+  expect(container.querySelector("fieldset")!.disabled).toBe(false);
+  expect(container.textContent).not.toContain("Šifranta ni mogoče naložiti.");
+});
+
+it("neuspešno shranjevanje ohrani polja in ne spremeni zaloge", async () => {
+  vi.mocked(receiveMaterial).mockRejectedValueOnce(new Error("Povezava s strežnikom ni uspela."));
+  await render(); fillForm(); await submit();
+  expect(container.querySelector<HTMLInputElement>('[name="supplier_lot_no"]')!.value).toBe(" NOVA ");
+  expect(container.querySelector<HTMLInputElement>('[name="received_qty"]')!.value).toBe("0,200");
+  expect(container.querySelector("strong")?.textContent).toBe("0,100 kg");
+  expect(container.querySelector("fieldset")!.disabled).toBe(false);
+  expect(container.querySelector(".success")).toBeNull();
+});
+
+it("napako validacije iz API prikaže ob količini", async () => {
+  vi.mocked(receiveMaterial).mockRejectedValueOnce(new InventoryApiError("Preveri podatke prejema.", { received_qty: "Preveri vneseno vrednost." }));
+  await render(); fillForm(); await submit();
+  expect(container.querySelector("#receipt-received_qty-error")?.textContent).toBe("Preveri vneseno vrednost.");
+  expect(container.querySelector('[name="received_qty"]')?.getAttribute("aria-invalid")).toBe("true");
+});

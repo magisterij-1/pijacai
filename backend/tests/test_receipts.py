@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from contextlib import contextmanager
 from decimal import Decimal
 from unittest.mock import patch
 from uuid import uuid4
@@ -188,3 +189,68 @@ def test_lookup_options_include_real_material_and_supplier(receipt_client):
     assert materials.status_code == suppliers.status_code == 200
     assert {"id": material.id, "name": material.name, "type": "ingredient", "unit": "kg"} in materials.json()
     assert {"id": supplier.id, "name": supplier.name} in suppliers.json()
+
+
+@pytest.mark.parametrize("change", ["material", "supplier"])
+def test_same_series_number_is_allowed_for_different_reference(receipt_client, change):
+    client, db, user, material, supplier = receipt_client
+    first = client.post("/api/material-lots", headers=headers(user), json=body(material, supplier))
+    assert first.status_code == 201
+    if change == "material":
+        material = Material(name="Druga test embalaža", type=MaterialType.packaging, unit="kos")
+        db.add(material)
+    else:
+        supplier = Supplier(name=f"Drug test dobavitelj {uuid4().hex}")
+        db.add(supplier)
+    db.flush()
+    second = client.post("/api/material-lots", headers=headers(user), json=body(material, supplier))
+    assert second.status_code == 201
+    assert second.json()["id"] != first.json()["id"]
+
+
+@pytest.mark.parametrize("quantity,cost", [
+    ("0.001", "0.001"), ("999999999.999", "999999999.999"),
+])
+def test_receipt_accepts_valid_numeric_boundaries(receipt_client, quantity, cost):
+    client, db, user, material, supplier = receipt_client
+    response = client.post("/api/material-lots", headers=headers(user), json=body(material, supplier, received_qty=quantity, unit_cost=cost))
+    assert response.status_code == 201
+    result = response.json()
+    assert Decimal(result["received_qty"]) == Decimal(quantity)
+    assert Decimal(result["unit_cost"]) == Decimal(cost)
+    assert set(result) == {"id", "material_id", "supplier_id", "supplier_lot_no", "received_qty", "remaining_qty", "unit_cost", "received_at", "received_by"}
+    assert db.get(MaterialLot, result["id"]).received_by == user.id
+
+
+@pytest.mark.parametrize("method,path", [
+    ("POST", "/api/material-lots"), ("GET", "/api/material-lots"),
+    ("GET", "/api/lookup/materials"), ("GET", "/api/lookup/suppliers"),
+])
+def test_old_warehouse_claim_is_rejected_after_database_role_change(receipt_client, method, path):
+    client, db, user, material, supplier = receipt_client
+    auth = headers(user)
+    user.role = Role.admin
+    db.flush()
+    response = client.request(method, path, headers=auth, json=body(material, supplier) if method == "POST" else None)
+    assert response.status_code == 403
+    assert db.scalar(select(func.count()).select_from(MaterialLot).where(MaterialLot.material_id == material.id)) == 0
+
+
+def test_demo_inventory_seed_is_repeatable_without_receipts(inventory_db, monkeypatch):
+    from app import seed_inventory
+
+    @contextmanager
+    def test_session():
+        yield inventory_db
+
+    monkeypatch.setattr(seed_inventory, "SessionLocal", test_session)
+
+    def counts():
+        return tuple(inventory_db.scalar(select(func.count()).select_from(model)) for model in (Supplier, Material, MaterialLot, User))
+
+    before = counts()
+    seed_inventory.main()
+    first = counts()
+    seed_inventory.main()
+    assert counts() == first
+    assert first[2:] == before[2:]
