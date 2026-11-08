@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { User } from "../api/auth";
 import { canAccess, pages, readPagePath } from "../navigation";
 import { RoleHome } from "./RoleHome";
+import { Users } from "./Users";
 
 export function Workspace({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [path, setPath] = useState(readPagePath);
@@ -43,6 +44,7 @@ export function Workspace({ user, onLogout }: { user: User; onLogout: () => void
         <section aria-labelledby="page-title">
           <h2 id="page-title" ref={heading} tabIndex={-1}>{page.title}</h2>
           <p className="muted">{page.description}</p>
+          {page.path === "/uporabniki" && <Users currentUserId={user.id} onSelfDeactivated={onLogout} />}
         </section>
       ) : (
         <section aria-labelledby="page-title">

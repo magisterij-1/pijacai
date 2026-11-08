@@ -91,13 +91,15 @@ label {
 }
 
 input,
+select,
 button {
   font: inherit;
   min-height: 2.75rem;
   border-radius: 0.4rem;
 }
 
-input {
+input,
+select {
   width: 100%;
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.6rem;
@@ -134,6 +136,7 @@ button.secondary:hover:not(:disabled) {
 }
 
 input:focus-visible,
+select:focus-visible,
 button:focus-visible,
 a:focus-visible,
 h2:focus-visible {
@@ -165,6 +168,69 @@ footer {
   margin-top: 2rem;
   padding-top: 0.75rem;
   font-size: 0.875rem;
+}
+
+.users-content {
+  display: grid;
+  gap: 1.5rem;
+}
+
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+  max-width: 30rem;
+}
+
+.field-error {
+  color: #8c1c21;
+}
+
+.success {
+  padding: 0.75rem;
+  background: #e7f4eb;
+  color: #1c5935;
+  border-radius: 0.4rem;
+}
+
+button.danger {
+  background: #9b2931;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #7b2027;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th,
+td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #d8e1e5;
+  vertical-align: top;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 480px) {
