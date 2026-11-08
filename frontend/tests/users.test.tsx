@@ -150,3 +150,57 @@ it("prikaže napako nalaganja in omogoči ponoven poskus", async () => {
   await act(async () => refresh.click());
   expect(container.querySelectorAll("tbody tr").length).toBe(2);
 });
+
+it("neuspešna deaktivacija ohrani aktiven račun in omogoči ponovitev", async () => {
+  vi.mocked(deactivateUser).mockRejectedValueOnce(new Error("Deaktivacija ni uspela."));
+  await render();
+  await act(async () => deactivateButton(2).click());
+  expect(container.textContent).toContain("Deaktivacija ni uspela.");
+  expect(deactivateButton(2).disabled).toBe(false);
+  expect(container.querySelectorAll("tbody tr")[1].textContent).toContain("Aktiven");
+  expect(onSelfDeactivated).not.toHaveBeenCalled();
+});
+
+it("pri praznem seznamu prikaže ustrezno sporočilo", async () => {
+  vi.mocked(listUsers).mockResolvedValue([]);
+  await render();
+  expect(container.textContent).toContain("Ni uporabnikov za prikaz.");
+  expect(container.querySelector("table")).toBeNull();
+});
+
+it("pri napaki ustvarjanja ohrani ime in e-pošto, počisti pa geslo", async () => {
+  vi.mocked(createUser).mockRejectedValueOnce(new Error("Povezava s strežnikom ni uspela."));
+  await render();
+  fillForm();
+  await submit();
+  expect(container.querySelector<HTMLInputElement>('[name="name"]')!.value).toBe("Planer");
+  expect(container.querySelector<HTMLInputElement>('[name="email"]')!.value).toBe("planner@pijacai.local");
+  expect(container.querySelector<HTMLInputElement>('[name="password"]')!.value).toBe("");
+  expect(container.querySelector("fieldset")!.disabled).toBe(false);
+});
+
+it("med ustvarjanjem prepreči ponovno pošiljanje obrazca", async () => {
+  let resolve!: (value: User) => void;
+  vi.mocked(createUser).mockReturnValue(new Promise<User>(done => { resolve = done; }));
+  await render();
+  fillForm();
+  await submit();
+  expect(container.querySelector("fieldset")!.disabled).toBe(true);
+  await submit();
+  expect(createUser).toHaveBeenCalledOnce();
+  await act(async () => { resolve({ id: 3, name: "Planer", email: "planner@pijacai.local", role: "planner", active: true }); });
+  expect(container.querySelector("fieldset")!.disabled).toBe(false);
+  expect(container.querySelectorAll("tbody tr").length).toBe(3);
+});
+
+it.each([
+  { name: "name", value: "   ", errorId: "user-name-error" },
+  { name: "email", value: "invalid", errorId: "user-email-error" },
+])("zavrne neveljavno polje $name pred API klicem", async ({ name, value, errorId }) => {
+  await render();
+  fillForm();
+  fill(name, value);
+  await submit();
+  expect(createUser).not.toHaveBeenCalled();
+  expect(container.querySelector(`#${errorId}`)).not.toBeNull();
+});
