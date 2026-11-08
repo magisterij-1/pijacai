@@ -5,11 +5,13 @@ import jwt
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from fastapi.routing import APIRoute
 
 from app.api.dependencies import require_roles
 from app.core.security import JWT_SECRET, create_access_token
 from app.database import get_db
 from app.models import Role, User
+from app.main import app
 
 
 @pytest.fixture
@@ -115,3 +117,16 @@ def test_database_role_takes_precedence_over_old_token_role(
 def test_missing_allowed_roles_is_a_configuration_error():
     with pytest.raises(ValueError, match="vsaj eno"):
         require_roles()
+
+
+def test_existing_api_routes_have_an_explicit_access_policy():
+    # Ob novi poslovni poti dopolni ta seznam in dodaj vedenjske teste njenih vlog.
+    public_routes = {("GET", "/api/health"), ("POST", "/api/auth/login")}
+    authenticated_routes = {("GET", "/api/auth/me")}
+    implemented_routes = {
+        (method, route.path)
+        for route in app.routes
+        if isinstance(route, APIRoute) and route.path.startswith("/api/")
+        for method in route.methods
+    }
+    assert implemented_routes == public_routes | authenticated_routes

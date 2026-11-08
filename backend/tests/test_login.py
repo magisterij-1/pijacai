@@ -143,13 +143,14 @@ def signed_token(**claims):
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
-def test_me_restores_session_with_current_database_role(client, user):
+@pytest.mark.parametrize("current_role", list(Role))
+def test_me_restores_session_with_current_database_role(client, user, current_role):
     test_client, db = client
     token = signed_token()
-    user.role = Role.planner
+    user.role = current_role
     response = test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    assert response.json()["user"]["role"] == "planner"
+    assert response.json()["user"]["role"] == current_role.value
     assert "password_hash" not in response.json()["user"]
     assert response.json()["expires_at"] == jwt.decode(token, JWT_SECRET, algorithms=["HS256"])["exp"]
     db.get.assert_called_once_with(User, 1)
