@@ -9,6 +9,7 @@ import { Workspace } from "../src/pages/Workspace";
 // Tukaj preverjamo navigacijo; API vedenje vmesnika preverjajo ločeni testi Users.
 vi.mock("../src/pages/Users", () => ({ Users: () => null }));
 vi.mock("../src/pages/ReceiveMaterials", () => ({ ReceiveMaterials: () => null }));
+vi.mock("../src/pages/Stock", () => ({ Stock: () => null }));
 
 // Pričakovanja iz US-03–US-15, ne iz konfiguracije navigacije.
 const permissions: Record<Role, string[]> = {

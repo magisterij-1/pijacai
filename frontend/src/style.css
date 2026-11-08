@@ -208,6 +208,55 @@ button.danger:hover:not(:disabled) {
   overflow-x: auto;
 }
 
+.stock-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.stock-filter {
+  flex: 1 1 16rem;
+}
+
+.stock-filter label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.stock-filters .secondary {
+  margin: 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-label input {
+  width: 1.25rem;
+  min-height: 1.25rem;
+  margin: 0;
+}
+
+.stock-totals {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.stock-totals li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem;
+  background: #edf5f5;
+  border-radius: 0.4rem;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
