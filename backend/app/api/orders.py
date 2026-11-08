@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.dependencies import require_roles
 from app.database import get_db
-from app.models import OrderStatus, Product, ProductionOrder, Recipe, RecipeItem, Role, User
+from app.models import Batch, OrderStatus, Product, ProductionOrder, Recipe, RecipeItem, Role, User
 from app.schemas.orders import MaterialRequirement, OrderCreate, OrderOut, OrderPreviewIn, OrderPreviewOut, ProductOption
 
 
@@ -106,7 +106,7 @@ def cancel_order(
     order = db.scalar(select(ProductionOrder).where(ProductionOrder.id == order_id).with_for_update())
     if order is None:
         raise HTTPException(status_code=404, detail="Proizvodni nalog ni najden.")
-    if order.status == OrderStatus.in_progress:
+    if order.status == OrderStatus.in_progress or db.scalar(select(Batch.id).where(Batch.order_id == order.id).limit(1)) is not None:
         raise HTTPException(status_code=409, detail="Naloga ni mogoče odpovedati, ker je šarža že zagnana.")
     if order.status != OrderStatus.planned:
         raise HTTPException(status_code=409, detail="Odpoved je dovoljena samo za načrtovan nalog.")

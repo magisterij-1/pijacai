@@ -137,6 +137,11 @@ def test_existing_api_routes_have_an_explicit_access_policy():
         ("POST", "/api/orders"),
         ("GET", "/api/orders"),
         ("POST", "/api/orders/{order_id}/cancel"),
+        ("GET", "/api/lookup/lines"),
+        ("POST", "/api/orders/{order_id}/batches/preview"),
+        ("POST", "/api/orders/{order_id}/batches"),
+        ("GET", "/api/batches"),
+        ("GET", "/api/batches/{batch_id}"),
     }
     implemented_routes = {
         (method, route.path)
