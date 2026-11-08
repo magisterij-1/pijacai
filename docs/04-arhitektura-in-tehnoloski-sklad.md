@@ -120,8 +120,9 @@ pijacai/
 | [0002](adr/0002-relacijska-baza-in-sledljivost.md) | PostgreSQL in relacijski model sledljivosti 
 | [0003](adr/0003-verzioniranje-receptur.md) | Različica recepture se pripne proizvodnemu nalogu 
 | [0004](adr/0004-transakcijska-poraba-po-fifo.md) | Transakcijska poraba zaloge po FIFO 
-| [0005](adr/0005-avtentikacija-in-seje.md) | Seja na strežniku za prijavo uporabnikov 
+| [0005](adr/0005-avtentikacija-in-seje.md) | Seja na strežniku za prijavo uporabnikov – nadomeščeno z ADR 0007 |
 | [0006](adr/0006-lokalno-okolje-z-docker-compose.md) | Docker Compose za lokalno razvojno okolje 
+| [0007](adr/0007-jwt-avtentikacija.md) | Prijava z JWT in preverjanje uporabnika na backendu |
 
 Ko se odločitev spremeni: doda se nova odločitev, stara pa se označi kot nadomeščena.
 

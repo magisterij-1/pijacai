@@ -1,6 +1,6 @@
 # Seja na strežniku za prijavo uporabnikov
 
-**Status:** Proposed
+**Status:** Superseded by [ADR 0007 – Prijava z JWT in preverjanje uporabnika na backendu](0007-jwt-avtentikacija.md)
 
 ## Context and Problem Statement
 
