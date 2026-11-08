@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import engine
 from app.api.auth import router as auth_router
+from app.api.users import router as users_router
 
 
 app = FastAPI(title="Pijacai API", version="0.1.0")
@@ -23,6 +24,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 app.include_router(auth_router)
+app.include_router(users_router)
 
 
 @app.exception_handler(RequestValidationError)
