@@ -4,6 +4,7 @@ import { canAccess, pages, readPagePath } from "../navigation";
 import { RoleHome } from "./RoleHome";
 import { Users } from "./Users";
 import { ReceiveMaterials } from "./ReceiveMaterials";
+import { Stock } from "./Stock";
 
 export function Workspace({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [path, setPath] = useState(readPagePath);
@@ -47,6 +48,7 @@ export function Workspace({ user, onLogout }: { user: User; onLogout: () => void
           <p className="muted">{page.description}</p>
           {page.path === "/uporabniki" && <Users currentUserId={user.id} onSelfDeactivated={onLogout} />}
           {page.path === "/prejem-surovin" && <ReceiveMaterials />}
+          {page.path === "/zaloge" && <Stock />}
         </section>
       ) : (
         <section aria-labelledby="page-title">

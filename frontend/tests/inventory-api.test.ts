@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { InventoryApiError, listMaterialLots, listMaterials, listSuppliers, receiveMaterial } from "../src/api/inventory";
+import { getStock, InventoryApiError, listMaterialLots, listMaterials, listSuppliers, receiveMaterial } from "../src/api/inventory";
 import { readToken, saveToken, unauthorizedEvent } from "../src/api/auth";
 import type { MaterialLot, ReceiptCreate } from "../src/api/inventory";
 
@@ -110,4 +110,21 @@ it("zavrne prazen uspešen odgovor in ohrani napako brez JSON", async () => {
   await expect(receiveMaterial(receipt)).rejects.toThrow("Neveljaven odgovor strežnika.");
   fetchMock.mockResolvedValueOnce(new Response("Service unavailable", { status: 503 }));
   await expect(listMaterialLots()).rejects.toBeInstanceOf(InventoryApiError);
+});
+
+it.each([
+  { options: {}, material: null, consumed: "false" },
+  { options: { material_id: 10, include_consumed: true }, material: "10", consumed: "true" },
+])("pregled zalog pravilno zapiše filter in stikalo v URL: $consumed", async ({ options, material, consumed }) => {
+  respond({ lots: [], totals: [] });
+  const controller = new AbortController();
+  await expect(getStock(options, controller.signal)).resolves.toEqual({ lots: [], totals: [] });
+  const [url, request] = fetchMock.mock.calls[0];
+  const parsed = new URL(String(url));
+  expect(parsed.pathname).toBe("/api/stock");
+  expect(parsed.searchParams.get("material_id")).toBe(material);
+  expect(parsed.searchParams.get("include_consumed")).toBe(consumed);
+  expect(request?.signal).toBe(controller.signal);
+  expect(request?.cache).toBe("no-store");
+  expect(new Headers(request?.headers).get("Authorization")).toBe("Bearer warehouse-token");
 });

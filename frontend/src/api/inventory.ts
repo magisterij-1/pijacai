@@ -10,6 +10,12 @@ export type MaterialLot = ReceiptCreate & {
   id: number; remaining_qty: string; received_at: string; received_by: number;
 };
 export type ReceiptFields = Partial<Record<keyof ReceiptCreate, string>>;
+export type StockLot = MaterialLot & {
+  material_name: string; material_type: Material["type"]; unit: string; supplier_name: string;
+};
+export type StockTotal = { material_id: number; material_name: string; unit: string; remaining_qty: string };
+export type Stock = { lots: StockLot[]; totals: StockTotal[] };
+export type StockOptions = { material_id?: number; include_consumed?: boolean };
 
 export class InventoryApiError extends Error {
   constructor(message: string, public fields: ReceiptFields = {}) { super(message); }
@@ -57,4 +63,11 @@ export function receiveMaterial(data: ReceiptCreate): Promise<MaterialLot> {
   return request("/material-lots", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
   });
+}
+
+export function getStock(options: StockOptions = {}, signal?: AbortSignal): Promise<Stock> {
+  const params = new URLSearchParams();
+  if (options.material_id !== undefined) params.set("material_id", String(options.material_id));
+  params.set("include_consumed", String(options.include_consumed ?? false));
+  return request(`/stock?${params}`, { signal, cache: "no-store" });
 }

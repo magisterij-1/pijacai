@@ -2,18 +2,11 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { InventoryApiError, listMaterialLots, listMaterials, listSuppliers, receiveMaterial } from "../api/inventory";
 import type { Material, MaterialLot, ReceiptFields, Supplier } from "../api/inventory";
+import { formatQuantity, milli } from "../quantities";
 
 const emptyForm = { material_id: "", supplier_id: "", supplier_lot_no: "", received_qty: "", unit_cost: "" };
 type Form = typeof emptyForm;
 
-// Zaloge se seštevajo kot cela števila tisočink, brez napak plavajoče vejice.
-function milli(value: string): bigint {
-  const [whole, fraction = ""] = value.split(".");
-  return BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, "0"));
-}
-function formatQuantity(value: bigint): string {
-  return `${(value / 1000n).toLocaleString("sl-SI")},${(value % 1000n).toString().padStart(3, "0")}`;
-}
 function validDecimal(value: string, positive: boolean): boolean {
   if (!/^\d+(?:\.\d{1,3})?$/.test(value) || value.length > 32) return false;
   const amount = milli(value);
