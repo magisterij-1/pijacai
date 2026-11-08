@@ -10,6 +10,7 @@ import { Workspace } from "../src/pages/Workspace";
 vi.mock("../src/pages/Users", () => ({ Users: () => null }));
 vi.mock("../src/pages/ReceiveMaterials", () => ({ ReceiveMaterials: () => null }));
 vi.mock("../src/pages/Stock", () => ({ Stock: () => null }));
+vi.mock("../src/pages/Orders", () => ({ Orders: () => null }));
 
 // Pričakovanja iz US-03–US-15, ne iz konfiguracije navigacije.
 const permissions: Record<Role, string[]> = {
