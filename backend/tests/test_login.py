@@ -1,9 +1,5 @@
-import os
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
-
-os.environ["DATABASE_URL"] = "postgresql+psycopg://test:test@localhost/test"
-os.environ["JWT_SECRET"] = "test-only-signing-key-with-at-least-32-bytes"
 
 import jwt
 import pytest
