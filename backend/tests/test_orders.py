@@ -1,15 +1,16 @@
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Date, cast, func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.security import create_access_token
+from app.core.security import JWT_SECRET, create_access_token
 from app.database import get_db
 from app.main import app
 from app.models import Material, MaterialLot, MaterialType, OrderStatus, Product, ProductionOrder, Recipe, RecipeItem, Role, User
@@ -250,3 +251,117 @@ def test_demo_production_seed_is_repeatable_without_orders_or_stock(order_client
     seed_production.main()
     assert tuple(db.scalar(select(func.count()).select_from(model)) for model in (Product, Recipe, RecipeItem)) == first
     assert tuple(db.scalar(select(func.count()).select_from(model)) for model in (ProductionOrder, MaterialLot)) == before
+
+
+def planned_order(db, data, state=OrderStatus.planned):
+    order = ProductionOrder(product_id=data.product.id, recipe_id=data.recipe.id, planned_qty=500,
+                            planned_date=data.today, status=state, created_by=data.user.id)
+    db.add(order)
+    db.flush()
+    return order
+
+
+def test_planner_cancels_order_preserving_details_and_history(order_client):
+    client, db, data = order_client
+    order = planned_order(db, data)
+    original = (order.id, order.product_id, order.recipe_id, order.planned_qty, order.planned_date, order.created_by)
+    response = client.post(f"/api/orders/{order.id}/cancel", headers=headers(data))
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+    db.refresh(order)
+    assert (order.id, order.product_id, order.recipe_id, order.planned_qty, order.planned_date, order.created_by) == original
+    assert order.status == OrderStatus.cancelled
+    planner_view = client.get("/api/orders", headers=headers(data)).json()
+    assert next(item for item in planner_view if item["id"] == order.id)["status"] == "cancelled"
+    data.user.role = Role.operator
+    db.flush()
+    assert order.id not in [item["id"] for item in client.get("/api/orders", headers=headers(data)).json()]
+
+
+@pytest.mark.parametrize("role", list(Role))
+def test_cancellation_only_allows_planner(order_client, role):
+    client, db, data = order_client
+    order = planned_order(db, data)
+    data.user.role = role
+    db.flush()
+    response = client.post(f"/api/orders/{order.id}/cancel", headers=headers(data))
+    assert response.status_code == (200 if role == Role.planner else 403)
+    db.refresh(order)
+    assert order.status == (OrderStatus.cancelled if role == Role.planner else OrderStatus.planned)
+
+
+@pytest.mark.parametrize("state", [OrderStatus.in_progress, OrderStatus.done, OrderStatus.cancelled])
+def test_non_planned_orders_cannot_be_cancelled(order_client, state):
+    client, db, data = order_client
+    order = planned_order(db, data, state)
+    response = client.post(f"/api/orders/{order.id}/cancel", headers=headers(data))
+    assert response.status_code == 409
+    if state == OrderStatus.in_progress:
+        assert response.json() == {"detail": "Naloga ni mogoče odpovedati, ker je šarža že zagnana."}
+    db.refresh(order)
+    assert order.status == state
+
+
+def test_repeated_cancellation_is_rejected_without_deleting_order(order_client):
+    client, db, data = order_client
+    order = planned_order(db, data)
+    assert client.post(f"/api/orders/{order.id}/cancel", headers=headers(data)).status_code == 200
+    assert client.post(f"/api/orders/{order.id}/cancel", headers=headers(data)).status_code == 409
+    assert db.get(ProductionOrder, order.id).status == OrderStatus.cancelled
+
+
+def test_missing_order_returns_404_on_cancellation(order_client):
+    client, db, data = order_client
+    missing = (db.scalar(select(func.max(ProductionOrder.id))) or 0) + 1
+    response = client.post(f"/api/orders/{missing}/cancel", headers=headers(data))
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Proizvodni nalog ni najden."}
+
+
+@pytest.mark.parametrize("order_id", ["0", "-1", "invalid", "2147483648"])
+def test_invalid_cancellation_id_returns_422(order_client, order_id):
+    client, _, data = order_client
+    assert client.post(f"/api/orders/{order_id}/cancel", headers=headers(data)).status_code == 422
+
+
+@pytest.mark.parametrize("case", ["missing", "invalid", "expired", "inactive"])
+def test_cancellation_requires_valid_active_login(order_client, case):
+    client, db, data = order_client
+    order = planned_order(db, data)
+    auth = headers(data)
+    if case == "missing":
+        auth = {}
+    elif case == "invalid":
+        auth = {"Authorization": "Bearer invalid-token"}
+    elif case == "expired":
+        now = datetime.now(timezone.utc)
+        token = jwt.encode({"sub": str(data.user.id), "role": "planner", "iat": now - timedelta(hours=2), "exp": now - timedelta(hours=1)}, JWT_SECRET, algorithm="HS256")
+        auth = {"Authorization": f"Bearer {token}"}
+    else:
+        data.user.active = False
+        db.flush()
+    assert client.post(f"/api/orders/{order.id}/cancel", headers=auth).status_code == 401
+    db.refresh(order)
+    assert order.status == OrderStatus.planned
+
+
+def test_old_planner_claim_cannot_cancel_after_role_change(order_client):
+    client, db, data = order_client
+    order = planned_order(db, data)
+    auth = headers(data)
+    data.user.role = Role.operator
+    db.flush()
+    assert client.post(f"/api/orders/{order.id}/cancel", headers=auth).status_code == 403
+    db.refresh(order)
+    assert order.status == OrderStatus.planned
+
+
+def test_planned_order_can_be_cancelled_after_its_recipe_is_deactivated(order_client):
+    client, db, data = order_client
+    order = planned_order(db, data)
+    data.recipe.active = False
+    db.flush()
+    response = client.post(f"/api/orders/{order.id}/cancel", headers=headers(data))
+    assert response.status_code == 200
+    assert response.json()["recipe_id"] == data.recipe.id
+    assert response.json()["status"] == "cancelled"
