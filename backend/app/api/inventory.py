@@ -26,6 +26,11 @@ def duplicate_lot() -> HTTPException:
     return HTTPException(status_code=409, detail="Ta serija je že vnesena.")
 
 
+@router.get("/material-lots", response_model=list[MaterialLotOut])
+def material_lots(user: User = Depends(require_roles(Role.warehouse)), db: Session = Depends(get_db)):
+    return db.scalars(select(MaterialLot).order_by(MaterialLot.received_at, MaterialLot.id)).all()
+
+
 @router.post("/material-lots", response_model=MaterialLotOut, status_code=status.HTTP_201_CREATED)
 def receive_material(
     data: MaterialLotCreate,

@@ -128,6 +128,7 @@ def test_existing_api_routes_have_an_explicit_access_policy():
         ("GET", "/api/users"),
         ("POST", "/api/users/{user_id}/deactivate"),
         ("POST", "/api/material-lots"),
+        ("GET", "/api/material-lots"),
         ("GET", "/api/lookup/materials"),
         ("GET", "/api/lookup/suppliers"),
     }
