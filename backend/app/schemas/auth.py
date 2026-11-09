@@ -1,3 +1,4 @@
+# — prijavni podatki, uporabnik in odgovor z JWT.
 from pydantic import BaseModel, ConfigDict, SecretStr
 
 from app.models import Role

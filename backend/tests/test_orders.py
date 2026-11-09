@@ -1,3 +1,4 @@
+# — predogled, recepture, nalogi in odpoved.
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal

@@ -1,3 +1,4 @@
+# — skupne nastavitve in izolirane PostgreSQL seje.
 import os
 import pytest
 

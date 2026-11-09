@@ -1,3 +1,4 @@
+// — glavni meni, poti in preverjanje dostopa.
 import { useEffect, useRef, useState } from "react";
 import type { User } from "../api/auth";
 import { canAccess, pages, readPagePath } from "../navigation";

@@ -1,3 +1,4 @@
+// — zahtevki za meritve, sprostitev in zavrnitev.
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { getQuality, rejectBatch, releaseBatch, saveQualityCheck } from "../src/api/quality";

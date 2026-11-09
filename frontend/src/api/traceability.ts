@@ -1,3 +1,4 @@
+// — iskanje šarž, materialov in dobaviteljevih serij.
 import { authenticatedRequest } from "./auth";
 import type { Batch } from "./batches";
 import type { Material } from "./inventory";

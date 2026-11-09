@@ -1,3 +1,4 @@
+# — uporabljene serije, povezane šarže in vsote.
 from datetime import datetime
 from decimal import Decimal
 

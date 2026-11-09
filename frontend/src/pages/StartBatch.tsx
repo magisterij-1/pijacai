@@ -1,3 +1,4 @@
+// — preverjanje zalog in zagon šarže.
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BatchApiError, listLines, previewBatch, startBatch } from "../api/batches";

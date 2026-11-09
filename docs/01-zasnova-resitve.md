@@ -1,3 +1,4 @@
+<!-- — problem, namen in zasnova aplikacije. -->
 # 01 – Zasnova rešitve
 
 ## Ime rešitve

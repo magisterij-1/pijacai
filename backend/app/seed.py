@@ -1,3 +1,4 @@
+# — interaktivna priprava začetnega administratorja.
 """Ročno ustvarjanje začetnega uporabnika za lokalni preizkus prijave."""
 from getpass import getpass
 

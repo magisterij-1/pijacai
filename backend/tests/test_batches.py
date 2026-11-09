@@ -1,3 +1,4 @@
+# — zagon, FIFO, sočasnost in zaključek šarže.
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from decimal import Decimal

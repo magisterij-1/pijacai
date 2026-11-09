@@ -1,3 +1,4 @@
+<!-- — funkcionalnosti F1–F13 in obseg MVP. -->
 # 02 – Funkcionalnosti in obseg
 
 ## 1. Uporabniške vloge

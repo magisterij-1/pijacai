@@ -1,3 +1,4 @@
+<!-- — arhitektura, tehnologije in končne točke API. -->
 # 04 – Arhitektura in tehnološki sklad
 
 ## 1. Arhitektura

@@ -1,3 +1,4 @@
+# — izključitve pri gradnji frontend slike.
 node_modules/
 dist/
 .vite/

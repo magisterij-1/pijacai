@@ -1,3 +1,4 @@
+// — navigacija in dostop za posamezne vloge.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";

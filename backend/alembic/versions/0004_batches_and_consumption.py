@@ -1,3 +1,4 @@
+# — linije, šarže in zapisi porabe.
 """Proizvodne linije, šarže in FIFO poraba.
 
 Revision ID: 0004_batches_and_consumption

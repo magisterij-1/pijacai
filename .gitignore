@@ -1,4 +1,5 @@
-﻿
+﻿# — datoteke in mape, izključene iz Gita.
+
 # Backend: Python / FastAPI / SQLAlchemy / Alembic
 __pycache__/
 *.py[cod]

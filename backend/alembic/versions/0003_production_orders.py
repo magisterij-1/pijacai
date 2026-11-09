@@ -1,3 +1,4 @@
+# — izdelki, recepture in proizvodni nalogi.
 """Izdelki, verzije receptur in proizvodni nalogi.
 
 Revision ID: 0003_production_orders

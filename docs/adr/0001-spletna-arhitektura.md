@@ -1,3 +1,4 @@
+<!-- — izbira spletne arhitekture. -->
 # Ločen spletni uporabniški vmesnik in zaledni API
 
 **Status:** Proposed

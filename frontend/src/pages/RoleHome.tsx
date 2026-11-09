@@ -1,3 +1,4 @@
+// — začetni prikaz glede na uporabniško vlogo.
 import { useEffect, useRef } from "react";
 import type { Role, User } from "../api/auth";
 

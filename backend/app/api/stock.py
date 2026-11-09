@@ -1,3 +1,4 @@
+# — pregled zalog, filtri in vsote.
 from decimal import Decimal
 from typing import Annotated
 

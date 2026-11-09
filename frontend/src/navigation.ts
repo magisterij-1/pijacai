@@ -1,3 +1,4 @@
+// — poti, naslovi strani in dovoljene vloge.
 import type { Role } from "./api/auth";
 
 export type Page = {

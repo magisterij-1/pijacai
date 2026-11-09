@@ -1,3 +1,4 @@
+<!-- — verzije receptur in pripenjanje na nalog. -->
 # Pripenjanje različice recepture proizvodnemu nalogu
 
 **Status:** Proposed

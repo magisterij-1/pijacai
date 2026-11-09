@@ -1,3 +1,4 @@
+// — pregled zalog po materialih in serijah.
 import { useEffect, useState } from "react";
 import { getStock, listMaterials } from "../api/inventory";
 import type { Material, Stock as StockData } from "../api/inventory";

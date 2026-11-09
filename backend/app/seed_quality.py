@@ -1,3 +1,4 @@
+# — demonstracijski parametri in meje kakovosti.
 """Priprava demonstracijskih parametrov brez spreminjanja obstoječih mej ali meritev."""
 from decimal import Decimal
 

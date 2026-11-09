@@ -1,3 +1,4 @@
+<!-- — lokalni zagon z Docker Compose. -->
 # Docker Compose za lokalno razvojno okolje
 
 **Status:** Proposed

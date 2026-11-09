@@ -1,3 +1,4 @@
+# — materiali, dobavitelji in prejete serije.
 """Dobavitelji, surovine in prejete serije.
 
 Revision ID: 0002_material_receipts

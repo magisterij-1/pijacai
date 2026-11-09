@@ -1,3 +1,4 @@
+// — zahtevki API za obe smeri sledljivosti.
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { findTraceLots, listTraceMaterials, traceBatchByCode, traceLot } from "../src/api/traceability";

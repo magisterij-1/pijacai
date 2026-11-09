@@ -1,3 +1,4 @@
+<!-- — tabele, polja, povezave in ER diagram. -->
 # 03 – Podatkovni model
 
 Podatkovna baza je relacijska (**PostgreSQL**). Model je zasnovan tako, da omogoča sledljivost v obe smeri: šaržo povezujemo s serijami surovin prek vmesne tabele porabe (povezava M:N).

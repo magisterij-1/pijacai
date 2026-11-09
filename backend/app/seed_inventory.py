@@ -1,3 +1,4 @@
+# — demonstracijski materiali in dobavitelji.
 """Ročna priprava demonstracijskega šifranta, brez prejemov ali sprememb zaloge."""
 from decimal import Decimal
 

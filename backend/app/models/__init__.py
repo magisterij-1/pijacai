@@ -1,3 +1,4 @@
+# — skupni izvozi in registracija modelov.
 from app.models.user import Role, User
 from app.models.inventory import Material, MaterialLot, MaterialType, Supplier
 from app.models.production import OrderStatus, Product, ProductionOrder, Recipe, RecipeItem

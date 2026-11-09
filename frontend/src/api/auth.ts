@@ -1,3 +1,4 @@
+// — prijava, shranjevanje JWT in zaščiteni zahtevki.
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
 
 export type Role = "operator" | "quality" | "planner" | "warehouse" | "admin";

@@ -1,3 +1,4 @@
+# — povezava SQLAlchemy, seje in osnova modelov.
 import os
 
 from sqlalchemy import create_engine

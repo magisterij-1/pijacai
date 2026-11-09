@@ -1,3 +1,4 @@
+<!-- — predloga za novo arhitekturno odločitev. -->
 # {Short title describing the decision}
 
 **Status:** Proposed | Accepted | Rejected | Deprecated | Superseded by [ADR-NNNN](NNNN-title.md)

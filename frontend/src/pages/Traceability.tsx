@@ -1,3 +1,4 @@
+// — izbira smeri in sledljivost po kodi šarže.
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { traceBatchByCode, TraceabilityApiError } from "../api/traceability";

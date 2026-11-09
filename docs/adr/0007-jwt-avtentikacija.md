@@ -1,3 +1,4 @@
+<!-- — veljavna odločitev o prijavi z JWT. -->
 # Prijava z JWT in preverjanje uporabnika na backendu
 
 **Status:** Accepted

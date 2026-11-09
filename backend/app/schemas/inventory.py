@@ -1,3 +1,4 @@
+# — prejemi, šifranti, zaloge in decimalne omejitve.
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated

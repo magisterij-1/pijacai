@@ -1,3 +1,4 @@
+<!-- — opis načrtovanih uporabniških zaslonov. -->
 # 06 – Wireframes
 
 Wireframe-i prikazujejo osnoven izgled MVP aplikacije **Pijacai**. Vsi zasloni imajo enako zasnovo: zgoraj vrstica z imenom aplikacije in prijavljenim uporabnikom, na levi meni, ki prikazuje samo strani za vlogo prijavljenega uporabnika (US-02), v sredini pa vsebina. Rdeče številke na slikah so oznake elementov, ki so opisani pod vsako sliko.

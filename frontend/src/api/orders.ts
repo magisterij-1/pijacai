@@ -1,3 +1,4 @@
+// — izdelki, predogled, shranjevanje in odpoved nalogov.
 import { authenticatedRequest } from "./auth";
 
 export type Product = { id: number; name: string; sku: string; unit: string };

@@ -1,3 +1,4 @@
+// — preverjanje zalog in potrjevanje zagona.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";

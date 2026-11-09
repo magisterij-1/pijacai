@@ -1,3 +1,4 @@
+<!-- — uporabniške zgodbe in pogoji sprejemljivosti. -->
 # 05 – Uporabniške zgodbe
 
 Dokument povezuje vseh 13 funkcionalnosti iz `02-funkcionalnosti-in-obseg.md` (F1–F13) z uporabniškimi zgodbami. Zgodbe US-01 do US-15 pokrivajo MVP (F1–F7), zgodbe US-16 do US-23 pa funkcionalnosti po MVP (F8–F13). Uporabljene so vloge, entitete in stanja iz `03-podatkovni-model.md` (npr. `batch.status`: `in_production`, `awaiting_qc`, `released`, `rejected`) ter poti API-ja iz `04-arhitektura-in-tehnoloski-sklad.md`.

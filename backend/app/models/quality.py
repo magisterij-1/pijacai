@@ -1,3 +1,4 @@
+# — parameter kakovosti in shranjena meritev.
 from datetime import datetime
 from decimal import Decimal
 

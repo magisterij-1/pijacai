@@ -1,3 +1,4 @@
+// — nastavitve TypeScript prevajanja in preverjanja.
 {
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,

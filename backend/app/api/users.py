@@ -1,3 +1,4 @@
+# — ustvarjanje, seznam in deaktivacija uporabnikov.
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status

@@ -1,3 +1,4 @@
+# — preverjanje zalog, zagon in zaključek šarže.
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status

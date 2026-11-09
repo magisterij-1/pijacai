@@ -1,3 +1,4 @@
+# — prijava, gesla, JWT in veljavnost seje.
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 

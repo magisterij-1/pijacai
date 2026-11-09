@@ -1,3 +1,4 @@
+// — zahtevki za linije, zagon in zaključek.
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { finishBatch, getBatch, listBatches, listLines, previewBatch, startBatch } from "../src/api/batches";

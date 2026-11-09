@@ -1,3 +1,4 @@
+# — predloga nove migracijske datoteke.
 """${message}
 
 Revision ID: ${up_revision}

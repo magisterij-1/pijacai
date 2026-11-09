@@ -1,3 +1,4 @@
+# — povezave serij in šarž ter skladnost obeh smeri.
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4

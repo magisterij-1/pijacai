@@ -1,3 +1,4 @@
+// — natančna decimalna pretvorba in oblikovanje količin.
 // Količine in vsote ohranimo kot cela števila tisočink.
 export function milli(value: string): bigint {
   const [whole, fraction = ""] = value.split(".");
