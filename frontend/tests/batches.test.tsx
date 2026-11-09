@@ -8,7 +8,12 @@ import { BatchApiError, finishBatch, getBatch, listBatches } from "../src/api/ba
 import type { Batch } from "../src/api/batches";
 import { Batches } from "../src/pages/Batches";
 
-vi.mock("../src/pages/QualityMeasurements", () => ({ QualityMeasurements: () => <p>Testni prikaz meritev kakovosti</p> }));
+vi.mock("../src/pages/QualityMeasurements", () => ({
+  QualityMeasurements: ({ onReleased }: { onReleased: (batch: Batch) => void }) => <>
+    <p>Testni prikaz meritev kakovosti</p>
+    <button onClick={() => onReleased({ ...finished, status: "released", decided_by: 8, decided_at: "2026-11-09T11:00:00Z" })}>Testna sprostitev</button>
+  </>,
+}));
 
 vi.mock("../src/api/batches", async importOriginal => {
   const actual = await importOriginal<typeof import("../src/api/batches")>();
@@ -21,6 +26,7 @@ const batch: Batch = {
   recipe_id: 3, recipe_version: 1, line_id: 10, line_name: "Linija 1", operator_id: 7,
   status: "in_production", planned_qty: "500.000", produced_qty: 0, rejected_qty: 0,
   started_at: "2026-11-09T10:00:00Z", finished_at: null,
+  decided_by: null, decided_at: null, decision_note: null,
   consumptions: [{ material_lot_id: 30, material_id: 20, material_name: "Koncentrat", supplier_name: "Dobavitelj", supplier_lot_no: "SER-1", qty: "40", unit: "kg" }],
 };
 const finished: Batch = { ...batch, status: "awaiting_qc", produced_qty: 480, rejected_qty: 5, finished_at: "2026-11-09T11:00:00Z" };
@@ -183,4 +189,17 @@ it("neuspešno nalaganje podrobnosti ne prikaže obrazca", async () => {
   await render(); await open();
   expect(container.textContent).toContain("Šarža ni najdena.");
   expect(container.querySelector("form")).toBeNull();
+});
+
+it("po sprostitvi osveži čakalno vrsto in prikaže odločitev v podrobnostih", async () => {
+  vi.mocked(listBatches).mockResolvedValue([finished]);
+  vi.mocked(getBatch).mockResolvedValue(finished);
+  await render({ ...operator, id: 8, role: "quality" }); await open();
+  vi.mocked(listBatches).mockResolvedValue([]);
+  await act(async () => button("Testna sprostitev").click());
+  expect(container.textContent).toContain(`Šarža ${batch.batch_code} je sproščena.`);
+  expect(container.textContent).toContain("Stanje: Sproščena");
+  expect(container.textContent).toContain("Odločil kontrolor #8");
+  expect(container.textContent).toContain("Ni šarž za kontrolo.");
+  expect(listBatches).toHaveBeenCalledTimes(2);
 });

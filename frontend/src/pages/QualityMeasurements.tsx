@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { Batch } from "../api/batches";
-import { getQuality, QualityApiError, saveQualityCheck } from "../api/quality";
-import type { QualityFields, QualityOverview } from "../api/quality";
+import { getQuality, QualityApiError, releaseBatch, saveQualityCheck } from "../api/quality";
+import type { QualityFields, QualityOverview, ReleaseProblems } from "../api/quality";
 import { formatDecimal, milli } from "../quantities";
 
 // Podpisane vrednosti pretvorimo v tisočinke brez izgube decimalne natančnosti.
@@ -13,10 +13,11 @@ function measurement(raw: string) {
   return { normalized, scaled: milli(unsigned) * (normalized.startsWith("-") ? -1n : 1n) };
 }
 
-export function QualityMeasurements({ batch, onSaving, onConflict }: {
+export function QualityMeasurements({ batch, onSaving, onConflict, onReleased }: {
   batch: Pick<Batch, "id" | "status">;
   onSaving: (saving: boolean) => void;
   onConflict: (message: string) => void;
+  onReleased: (batch: Batch) => void;
 }) {
   const [overview, setOverview] = useState<QualityOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +29,8 @@ export function QualityMeasurements({ batch, onSaving, onConflict }: {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [releaseProblems, setReleaseProblems] = useState<ReleaseProblems | null>(null);
   const pending = useRef(false);
   const active = useRef(true);
   const parameter = overview?.parameters.find(item => item.id === Number(parameterId));
@@ -35,6 +38,9 @@ export function QualityMeasurements({ batch, onSaving, onConflict }: {
   const lower = parameter && measurement(parameter.min_value);
   const upper = parameter && measurement(parameter.max_value);
   const preview = parsed && lower && upper ? parsed.scaled >= lower.scaled && parsed.scaled <= upper.scaled : null;
+  const missing = overview?.parameters.filter(item => !item.latest_check) ?? [];
+  const invalid = overview?.parameters.filter(item => item.latest_check && !item.latest_check.passed) ?? [];
+  const canRelease = batch.status === "awaiting_qc" && !!overview?.parameters.length && !missing.length && !invalid.length;
 
   useEffect(() => {
     active.current = true;
@@ -57,7 +63,7 @@ export function QualityMeasurements({ batch, onSaving, onConflict }: {
     const errors: QualityFields = {};
     if (!parameter) errors.parameter_id = "Izberi parameter izdelka.";
     if (!parsed) errors.value = "Vnesi število z največ 9 mesti pred vejico in 3 decimalnimi mesti.";
-    setFields(errors); setError(""); setSuccess("");
+    setFields(errors); setError(""); setSuccess(""); setReleaseProblems(null);
     if (Object.keys(errors).length || !parsed || !parameter) return;
     pending.current = true; setSaving(true); onSaving(true);
     try {
@@ -78,14 +84,41 @@ export function QualityMeasurements({ batch, onSaving, onConflict }: {
     }
   }
 
+  async function release() {
+    if (pending.current || loading || !canRelease) return;
+    pending.current = true; setSaving(true); setReleasing(true); onSaving(true);
+    setError(""); setSuccess(""); setReleaseProblems(null);
+    try {
+      const result = await releaseBatch(batch.id);
+      if (!active.current) return;
+      setSuccess("Šarža je uspešno sproščena.");
+      onReleased(result);
+    } catch (error) {
+      if (!active.current) return;
+      setError(error instanceof Error ? error.message : "Sprostitev šarže ni uspela.");
+      if (error instanceof QualityApiError) {
+        setReleaseProblems(error.problems);
+        if (error.status === 422) setRefresh(version => version + 1);
+        if (error.status === 409 || error.status === 403 || error.status === 404) onConflict(error.message);
+      }
+    } finally {
+      pending.current = false;
+      if (active.current) { setSaving(false); setReleasing(false); onSaving(false); }
+    }
+  }
+
   return <section aria-labelledby="quality-title">
     <div className="workspace-header">
       <h4 id="quality-title">Meritve kakovosti</h4>
-      <button className="secondary" disabled={loading || saving} onClick={() => { setError(""); setRefresh(version => version + 1); }}>Osveži meritve</button>
+      <button className="secondary" disabled={loading || saving} onClick={() => { setError(""); setReleaseProblems(null); setRefresh(version => version + 1); }}>Osveži meritve</button>
     </div>
     {loading && <p role="status">Nalaganje meritev …</p>}
     {loadError && <p className="error" role="alert">{loadError}</p>}
     {error && <p className="error" role="alert">{error}</p>}
+    {releaseProblems && <div role="alert">
+      {!!releaseProblems.missing.length && <><p>Manjkajoči parametri ob sprostitvi:</p><ul>{releaseProblems.missing.map(item => <li key={item.parameter_id}>{item.name}</li>)}</ul></>}
+      {!!releaseProblems.invalid.length && <><p>Neustrezni parametri ob sprostitvi:</p><ul>{releaseProblems.invalid.map(item => <li key={item.parameter_id}>{item.name}</li>)}</ul></>}
+    </div>}
     {success && <p className="success" role="status">{success}</p>}
     {overview && <>
       {!overview.parameters.length ? <p>Za izdelek ni določenih parametrov kakovosti.</p> : <>
@@ -113,10 +146,18 @@ export function QualityMeasurements({ batch, onSaving, onConflict }: {
               onChange={event => { setValue(event.target.value); setFields(current => ({ ...current, value: undefined })); setError(""); setSuccess(""); }} />
             {fields.value && <small id="quality-value-error" className="field-error" role="alert">{fields.value}</small>}
             {preview !== null && <p role="status">Predogled: {preview ? "ustreza" : "ne ustreza"}. Meritev še ni shranjena.</p>}
-            <button type="submit">{saving ? "Shranjevanje …" : "Shrani meritev"}</button>
+            <button type="submit">{saving && !releasing ? "Shranjevanje …" : "Shrani meritev"}</button>
           </fieldset>
         </form> : <p>Meritve je mogoče vnašati samo za šaržo, ki čaka na kontrolo.</p>}
       </>}
+      {batch.status === "awaiting_qc" && <section aria-labelledby="release-title">
+        <h4 id="release-title">Sprostitev šarže</h4>
+        <p>Sprostitev upošteva zadnje shranjene meritve vseh zahtevanih parametrov.</p>
+        {!!missing.length && <p>Manjkajoče meritve: {missing.map(item => item.name).join(", ")}.</p>}
+        {!!invalid.length && <p>Neustrezne meritve: {invalid.map(item => item.name).join(", ")}.</p>}
+        {canRelease && <p>Vse zahtevane meritve so vnesene in ustrezajo mejam.</p>}
+        <button type="button" disabled={loading || saving || !canRelease} onClick={() => void release()}>{releasing ? "Sproščanje …" : "Sprosti šaržo"}</button>
+      </section>}
       {!!overview.checks.length && <details>
         <summary>Zgodovina meritev</summary>
         <div className="table-scroll"><table aria-label="Zgodovina meritev kakovosti">

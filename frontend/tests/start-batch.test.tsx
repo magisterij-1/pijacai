@@ -27,6 +27,7 @@ const batch: Batch = {
   recipe_id: 3, recipe_version: 1, line_id: 10, line_name: "Linija 1", operator_id: 7,
   status: "in_production", planned_qty: "500.000", produced_qty: 0, rejected_qty: 0,
   started_at: "2026-11-09T10:00:00Z", finished_at: null,
+  decided_by: null, decided_at: null, decision_note: null,
   consumptions: [
     { material_lot_id: 30, material_id: 20, material_name: "Koncentrat", supplier_name: "Dobavitelj", supplier_lot_no: "STARA", qty: "30", unit: "kg" },
     { material_lot_id: 31, material_id: 20, material_name: "Koncentrat", supplier_name: "Dobavitelj", supplier_lot_no: "NOVA", qty: "10", unit: "kg" },

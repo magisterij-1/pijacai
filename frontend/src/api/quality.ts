@@ -1,4 +1,5 @@
 import { authenticatedRequest } from "./auth";
+import type { Batch } from "./batches";
 
 export type QualityCheck = {
   id: number; batch_id: number; parameter_id: number; value: string;
@@ -11,9 +12,14 @@ export type QualityParameter = {
 export type QualityOverview = { batch_id: number; parameters: QualityParameter[]; checks: QualityCheck[] };
 export type QualityInput = { parameter_id: number; value: string };
 export type QualityFields = Partial<Record<keyof QualityInput, string>>;
+export type ParameterProblem = { parameter_id: number; name: string };
+export type ReleaseProblems = {
+  code: "QUALITY_NOT_PASSED" | "NO_QUALITY_PARAMETERS";
+  missing: ParameterProblem[]; invalid: ParameterProblem[];
+};
 
 export class QualityApiError extends Error {
-  constructor(message: string, public fields: QualityFields = {}, public status?: number) { super(message); }
+  constructor(message: string, public fields: QualityFields = {}, public status?: number, public problems: ReleaseProblems | null = null) { super(message); }
 }
 
 async function request<T>(path: string, options: RequestInit): Promise<T> {
@@ -25,6 +31,13 @@ async function request<T>(path: string, options: RequestInit): Promise<T> {
   }
   const body = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status === 422 && (body?.detail?.code === "QUALITY_NOT_PASSED" || body?.detail?.code === "NO_QUALITY_PARAMETERS")) {
+      throw new QualityApiError(body.detail.message, {}, 422, {
+        code: body.detail.code,
+        missing: Array.isArray(body.detail.missing) ? body.detail.missing : [],
+        invalid: Array.isArray(body.detail.invalid) ? body.detail.invalid : [],
+      });
+    }
     if (response.status === 422 && Array.isArray(body?.detail)) {
       const fields: QualityFields = {};
       for (const item of body.detail) {
@@ -48,4 +61,7 @@ export function saveQualityCheck(batchId: number, data: QualityInput): Promise<Q
   return request(`/batches/${batchId}/checks`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
   });
+}
+export function releaseBatch(batchId: number): Promise<Batch> {
+  return request(`/batches/${batchId}/release`, { method: "POST" });
 }
