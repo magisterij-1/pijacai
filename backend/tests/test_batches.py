@@ -16,7 +16,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from app.core.security import create_access_token
 from app.database import Base, get_db
 from app.main import app
-from app.models import Batch, BatchConsumption, Material, MaterialLot, MaterialType, OrderStatus, Product, ProductionLine, ProductionOrder, Recipe, RecipeItem, Role, Supplier, User
+from app.models import Batch, BatchConsumption, BatchStatus, Material, MaterialLot, MaterialType, OrderStatus, Product, ProductionLine, ProductionOrder, Recipe, RecipeItem, Role, Supplier, User
 
 
 def setup_data(db):
@@ -87,6 +87,187 @@ def counts(db, data):
     batches = select(Batch.id).where(Batch.order_id == data.order.id)
     return (db.scalar(select(func.count()).select_from(Batch).where(Batch.order_id == data.order.id)),
             db.scalar(select(func.count()).select_from(BatchConsumption).where(BatchConsumption.batch_id.in_(batches))))
+
+
+@pytest.fixture
+def running_batch(batch_client):
+    client, db, data = batch_client
+    response = client.post(start_path(data), headers=auth(data.operator), json=payload(data))
+    assert response.status_code == 201
+    return client, db, data, response.json()
+
+
+def assert_unfinished(db, batch_id):
+    batch = db.get(Batch, batch_id, populate_existing=True)
+    assert batch.status == BatchStatus.in_production
+    assert batch.produced_qty == batch.rejected_qty == 0
+    assert batch.finished_at is None
+
+
+@pytest.mark.parametrize("produced,rejected", [(480, 5), (0, 0), (500, 500), (2147483647, 0)])
+def test_finish_records_quantities_and_places_batch_in_quality_queue(running_batch, produced, rejected):
+    client, db, data, started = running_batch
+    before = {lot.id: lot.remaining_qty for lot in data.lots}
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=auth(data.operator),
+                           json={"produced_qty": produced, "rejected_qty": rejected})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "awaiting_qc"
+    assert result["produced_qty"] == produced
+    assert result["rejected_qty"] == rejected
+    assert datetime.fromisoformat(result["finished_at"]) >= datetime.fromisoformat(started["started_at"])
+    assert result["consumptions"] == started["consumptions"]
+    saved = db.get(Batch, started["id"], populate_existing=True)
+    assert saved.status == BatchStatus.awaiting_qc
+    assert (saved.produced_qty, saved.rejected_qty) == (produced, rejected)
+    assert saved.finished_at is not None
+    db.refresh(data.order)
+    assert data.order.status == OrderStatus.in_progress
+    for lot in data.lots:
+        db.refresh(lot)
+        assert lot.remaining_qty == before[lot.id]
+    assert counts(db, data) == (1, 3)
+    data.planner.role = Role.quality
+    db.commit()
+    queue = client.get("/api/batches", params={"status_filter": "awaiting_qc", "order_id": data.order.id}, headers=auth(data.planner))
+    assert queue.status_code == 200
+    assert [batch["id"] for batch in queue.json()] == [started["id"]]
+    active = client.get("/api/batches", params={"status_filter": "in_production", "order_id": data.order.id}, headers=auth(data.operator))
+    assert active.status_code == 200
+    assert active.json() == []
+
+
+@pytest.mark.parametrize("field,value", [
+    ("produced_qty", -1), ("rejected_qty", -1),
+    ("produced_qty", 1.5), ("rejected_qty", 1.5),
+    ("produced_qty", True), ("rejected_qty", False),
+    ("produced_qty", "500"), ("rejected_qty", "0"),
+    ("produced_qty", None), ("rejected_qty", None),
+    ("produced_qty", 2147483648), ("rejected_qty", 2147483648),
+])
+def test_finish_rejects_invalid_quantities_without_changes(running_batch, field, value):
+    client, db, data, started = running_batch
+    body = {"produced_qty": 500, "rejected_qty": 0, field: value}
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=auth(data.operator), json=body)
+    assert response.status_code == 422
+    assert any(item["loc"] == ["body", field] for item in response.json()["detail"])
+    assert_unfinished(db, started["id"])
+
+
+@pytest.mark.parametrize("field", ["produced_qty", "rejected_qty"])
+def test_finish_requires_both_quantities(running_batch, field):
+    client, db, data, started = running_batch
+    body = {"produced_qty": 500, "rejected_qty": 0}
+    del body[field]
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=auth(data.operator), json=body)
+    assert response.status_code == 422
+    assert any(item["loc"] == ["body", field] for item in response.json()["detail"])
+    assert_unfinished(db, started["id"])
+
+
+def test_finish_excess_waste_has_error_at_rejected_quantity(running_batch):
+    client, db, data, started = running_batch
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=auth(data.operator),
+                           json={"produced_qty": 10, "rejected_qty": 11})
+    assert response.status_code == 422
+    error = next(item for item in response.json()["detail"] if item["loc"] == ["body", "rejected_qty"])
+    assert "Izmet ne sme presegati proizvedene količine." in error["msg"]
+    assert_unfinished(db, started["id"])
+
+
+@pytest.mark.parametrize("role", [Role.admin, Role.planner, Role.quality, Role.warehouse])
+def test_finish_denies_other_roles(running_batch, role):
+    client, db, data, started = running_batch
+    data.planner.role = role
+    db.commit()
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=auth(data.planner),
+                           json={"produced_qty": 500, "rejected_qty": 0})
+    assert response.status_code == 403
+    assert_unfinished(db, started["id"])
+
+
+def test_finish_denies_another_operator(running_batch):
+    client, db, data, started = running_batch
+    data.planner.role = Role.operator
+    db.commit()
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=auth(data.planner),
+                           json={"produced_qty": 500, "rejected_qty": 0})
+    assert response.status_code == 403
+    assert_unfinished(db, started["id"])
+
+
+@pytest.mark.parametrize("case", ["missing", "invalid", "inactive"])
+def test_finish_requires_active_login(running_batch, case):
+    client, db, data, started = running_batch
+    headers = {} if case == "missing" else {"Authorization": "Bearer invalid"}
+    if case == "inactive":
+        headers = auth(data.operator)
+        data.operator.active = False
+        db.commit()
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=headers,
+                           json={"produced_qty": 500, "rejected_qty": 0})
+    assert response.status_code == 401
+    assert_unfinished(db, started["id"])
+
+
+def test_finish_cannot_overwrite_previously_finished_batch(running_batch):
+    client, db, data, started = running_batch
+    path = f"/api/batches/{started['id']}/finish"
+    first = client.post(path, headers=auth(data.operator), json={"produced_qty": 480, "rejected_qty": 5})
+    assert first.status_code == 200
+    second = client.post(path, headers=auth(data.operator), json={"produced_qty": 999, "rejected_qty": 1})
+    assert second.status_code == 409
+    saved = client.get(f"/api/batches/{started['id']}", headers=auth(data.operator))
+    assert saved.status_code == 200
+    assert saved.json() == first.json()
+
+
+@pytest.mark.parametrize("state", [BatchStatus.released, BatchStatus.rejected])
+def test_finish_cannot_change_decided_batch(running_batch, state):
+    client, db, data, started = running_batch
+    batch = db.get(Batch, started["id"])
+    batch.status = state
+    db.commit()
+    response = client.post(f"/api/batches/{batch.id}/finish", headers=auth(data.operator),
+                           json={"produced_qty": 500, "rejected_qty": 0})
+    assert response.status_code == 409
+    db.refresh(batch)
+    assert batch.status == state
+    assert batch.produced_qty == batch.rejected_qty == 0
+    assert batch.finished_at is None
+
+
+def test_finish_missing_batch_is_404(batch_client):
+    client, db, data = batch_client
+    absent = (db.scalar(select(func.max(Batch.id))) or 0) + 1
+    response = client.post(f"/api/batches/{absent}/finish", headers=auth(data.operator),
+                           json={"produced_qty": 500, "rejected_qty": 0})
+    assert response.status_code == 404
+    assert counts(db, data) == (0, 0)
+
+
+def test_finish_rejects_extra_state_fields(running_batch):
+    client, db, data, started = running_batch
+    response = client.post(f"/api/batches/{started['id']}/finish", headers=auth(data.operator),
+                           json={"produced_qty": 500, "rejected_qty": 0, "status": "released"})
+    assert response.status_code == 422
+    assert_unfinished(db, started["id"])
+
+
+def test_finish_commit_failure_rolls_back_and_allows_retry(running_batch):
+    client, db, data, started = running_batch
+    path = f"/api/batches/{started['id']}/finish"
+    before = {lot.id: lot.remaining_qty for lot in data.lots}
+    with patch.object(db, "commit", side_effect=RuntimeError("Simulirana napaka zaključka")):
+        with pytest.raises(RuntimeError, match="Simulirana napaka zaključka"):
+            client.post(path, headers=auth(data.operator), json={"produced_qty": 480, "rejected_qty": 5})
+    assert_unfinished(db, started["id"])
+    for lot in data.lots:
+        db.refresh(lot)
+        assert lot.remaining_qty == before[lot.id]
+    assert counts(db, data) == (1, 3)
+    retry = client.post(path, headers=auth(data.operator), json={"produced_qty": 480, "rejected_qty": 5})
+    assert retry.status_code == 200
 
 
 def test_preview_checks_all_ingredients_without_writes(batch_client):

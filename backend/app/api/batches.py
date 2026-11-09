@@ -1,13 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_roles
 from app.database import get_db
 from app.models import Batch, BatchConsumption, BatchStatus, MaterialLot, ProductionLine, ProductionOrder, Role, User
-from app.schemas.batches import BatchDetail, BatchPreview, BatchStart, BatchSummary, ConsumptionOut, LineOption
+from app.schemas.batches import BatchDetail, BatchFinish, BatchPreview, BatchStart, BatchSummary, ConsumptionOut, LineOption
 from app.services.batch_start import prepare, start
 
 
@@ -52,6 +52,30 @@ def preview_batch(order_id: PathId, data: BatchStart, user: User = Depends(requi
 def start_batch(order_id: PathId, data: BatchStart, user: User = Depends(require_roles(Role.operator)), db: Session = Depends(get_db)):
     try:
         batch = start(db, order_id, data, user)
+        result = detail(db, batch)
+        db.commit()
+        return result
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post("/batches/{batch_id}/finish", response_model=BatchDetail)
+def finish_batch(batch_id: PathId, data: BatchFinish, user: User = Depends(require_roles(Role.operator)), db: Session = Depends(get_db)):
+    try:
+        batch = db.scalar(select(Batch).where(Batch.id == batch_id)
+                          .with_for_update().execution_options(populate_existing=True))
+        if batch is None:
+            raise HTTPException(status_code=404, detail="Šarža ni najdena.")
+        if batch.operator_id != user.id:
+            raise HTTPException(status_code=403, detail="Zaključiš lahko samo šaržo, ki si jo zagnal.")
+        if batch.status != BatchStatus.in_production:
+            raise HTTPException(status_code=409, detail="Zaključiti je mogoče samo šaržo v proizvodnji.")
+        batch.produced_qty = data.produced_qty
+        batch.rejected_qty = data.rejected_qty
+        batch.finished_at = db.scalar(select(func.clock_timestamp()))
+        batch.status = BatchStatus.awaiting_qc
+        db.flush()
         result = detail(db, batch)
         db.commit()
         return result
