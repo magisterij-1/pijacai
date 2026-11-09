@@ -64,6 +64,8 @@ Primeri pomembnejših končnih točk (načrt):
 | `GET /traceability/batch/{id}` | Sledljivost nazaj | planer, kontrolor |
 | `GET /traceability/batch?batch_code=...` | Sledljivost po točni kodi šarže; vključuje vsote porabe po surovinah | planer, kontrolor |
 | `GET /traceability/lot/{id}` | Sledljivost naprej | planer, kontrolor |
+| `GET /traceability/materials` | Izbor surovin in embalaže za sledljivost | planer, kontrolor |
+| `GET /traceability/lots?material_id=...&supplier_lot_no=...` | Točno iskanje serij; pri isti številki različnih dobaviteljev vrne vse kandidate | planer, kontrolor |
 
 ### Podatkovna baza
 
