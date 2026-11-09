@@ -7,6 +7,8 @@ import { traceBatchByCode, TraceabilityApiError } from "../src/api/traceability"
 import type { BatchTraceability } from "../src/api/traceability";
 import { Traceability } from "../src/pages/Traceability";
 
+vi.mock("../src/pages/LotTraceability", () => ({ LotTraceability: () => <p>Testni prikaz serije surovine</p> }));
+
 vi.mock("../src/api/traceability", async importOriginal => {
   const actual = await importOriginal<typeof import("../src/api/traceability")>();
   return { ...actual, traceBatchByCode: vi.fn() };
@@ -132,7 +134,7 @@ it("med nespremenjenim iskanjem prepreči ponoven zahtevek", async () => {
   vi.mocked(traceBatchByCode).mockReturnValueOnce(new Promise<BatchTraceability>(done => { resolve = done; }));
   code(result.batch_code); await search(); await search();
   expect(traceBatchByCode).toHaveBeenCalledOnce();
-  expect(container.querySelector("button")!.disabled).toBe(true);
+  expect(container.querySelector<HTMLButtonElement>("form button")!.disabled).toBe(true);
   await act(async () => resolve(result));
 });
 
@@ -143,4 +145,15 @@ it("po omrežni napaki omogoči ponovno iskanje", async () => {
   await search();
   expect(container.querySelector("#trace-result-title")).not.toBeNull();
   expect(container.textContent).not.toContain("Povezava s strežnikom ni uspela.");
+});
+
+it("preklaplja med smerema in odstrani prejšnji prikaz", async () => {
+  code(result.batch_code); await search();
+  const buttons = () => Array.from(container.querySelectorAll("button"));
+  await act(async () => buttons().find(item => item.textContent === "Po seriji surovine")!.click());
+  expect(container.textContent).toContain("Testni prikaz serije surovine");
+  expect(container.querySelector("#trace-result-title")).toBeNull();
+  await act(async () => buttons().find(item => item.textContent === "Po šarži")!.click());
+  expect(container.querySelector<HTMLInputElement>("#trace-batch-code")!.value).toBe("");
+  expect(container.textContent).not.toContain("Testni prikaz serije surovine");
 });
