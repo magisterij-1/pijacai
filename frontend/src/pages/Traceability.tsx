@@ -3,12 +3,24 @@ import type { FormEvent } from "react";
 import { traceBatchByCode, TraceabilityApiError } from "../api/traceability";
 import type { BatchTraceability } from "../api/traceability";
 import { formatDecimal } from "../quantities";
+import { LotTraceability } from "./LotTraceability";
 
 const statusNames: Record<BatchTraceability["status"], string> = {
   in_production: "V proizvodnji", awaiting_qc: "Čaka na kontrolo", released: "Sproščena", rejected: "Zavrnjena",
 };
 
 export function Traceability() {
+  const [direction, setDirection] = useState<"batch" | "lot">("batch");
+  return <>
+    <div className="stock-filters" aria-label="Smer sledljivosti">
+      <button className="secondary" type="button" aria-pressed={direction === "batch"} onClick={() => setDirection("batch")}>Po šarži</button>
+      <button className="secondary" type="button" aria-pressed={direction === "lot"} onClick={() => setDirection("lot")}>Po seriji surovine</button>
+    </div>
+    {direction === "batch" ? <BatchTraceabilityView /> : <LotTraceability />}
+  </>;
+}
+
+function BatchTraceabilityView() {
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState("");
   const [error, setError] = useState("");
