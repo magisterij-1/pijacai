@@ -9,9 +9,10 @@ import type { Batch } from "../src/api/batches";
 import { Batches } from "../src/pages/Batches";
 
 vi.mock("../src/pages/QualityMeasurements", () => ({
-  QualityMeasurements: ({ onReleased }: { onReleased: (batch: Batch) => void }) => <>
+  QualityMeasurements: ({ onReleased, onRejected }: { onReleased: (batch: Batch) => void; onRejected: (batch: Batch) => void }) => <>
     <p>Testni prikaz meritev kakovosti</p>
     <button onClick={() => onReleased({ ...finished, status: "released", decided_by: 8, decided_at: "2026-11-09T11:00:00Z" })}>Testna sprostitev</button>
+    <button onClick={() => onRejected({ ...finished, status: "rejected", decided_by: 8, decided_at: "2026-11-09T11:00:00Z", decision_note: "Neustrezna vrednost pH." })}>Testna zavrnitev</button>
   </>,
 }));
 
@@ -202,4 +203,23 @@ it("po sprostitvi osveži čakalno vrsto in prikaže odločitev v podrobnostih",
   expect(container.textContent).toContain("Odločil kontrolor #8");
   expect(container.textContent).toContain("Ni šarž za kontrolo.");
   expect(listBatches).toHaveBeenCalledTimes(2);
+});
+
+it("po zavrnitvi odstrani šaržo iz čakalne vrste in ohrani razlog v podrobnostih", async () => {
+  vi.mocked(listBatches).mockResolvedValue([finished]);
+  vi.mocked(getBatch).mockResolvedValue(finished);
+  await render({ ...operator, id: 8, role: "quality" }); await open();
+  vi.mocked(listBatches).mockResolvedValue([]);
+  await act(async () => button("Testna zavrnitev").click());
+  expect(container.textContent).toContain(`Šarža ${batch.batch_code} je zavrnjena.`);
+  expect(container.textContent).toContain("Stanje: Zavrnjena");
+  expect(container.textContent).toContain("Razlog zavrnitve: Neustrezna vrednost pH.");
+  expect(container.textContent).toContain("Ni šarž za kontrolo.");
+  expect(listBatches).toHaveBeenCalledTimes(2);
+});
+
+it.each(["operator", "planner", "quality"] as const)("na podrobnostih prikaže shranjeni razlog tudi za %s", async role => {
+  vi.mocked(getBatch).mockResolvedValue({ ...finished, status: "rejected", decision_note: "Neustrezna embalaža izdelka." });
+  await render({ ...operator, role }); await open();
+  expect(container.textContent).toContain("Razlog zavrnitve: Neustrezna embalaža izdelka.");
 });

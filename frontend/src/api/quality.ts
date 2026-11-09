@@ -11,7 +11,7 @@ export type QualityParameter = {
 };
 export type QualityOverview = { batch_id: number; parameters: QualityParameter[]; checks: QualityCheck[] };
 export type QualityInput = { parameter_id: number; value: string };
-export type QualityFields = Partial<Record<keyof QualityInput, string>>;
+export type QualityFields = Partial<Record<keyof QualityInput | "decision_note", string>>;
 export type ParameterProblem = { parameter_id: number; name: string };
 export type ReleaseProblems = {
   code: "QUALITY_NOT_PASSED" | "NO_QUALITY_PARAMETERS";
@@ -42,11 +42,11 @@ async function request<T>(path: string, options: RequestInit): Promise<T> {
       const fields: QualityFields = {};
       for (const item of body.detail) {
         const field: unknown = item.loc?.[item.loc.length - 1];
-        if (field === "parameter_id" || field === "value") {
+        if (field === "parameter_id" || field === "value" || field === "decision_note") {
           fields[field] = item.type === "value_error" && typeof item.msg === "string" ? item.msg : "Preveri vneseno vrednost.";
         }
       }
-      throw new QualityApiError("Preveri podatke meritve.", fields, 422);
+      throw new QualityApiError("Preveri vnesene podatke.", fields, 422);
     }
     throw new QualityApiError(typeof body?.detail === "string" ? body.detail : "Podatkov kakovosti ni mogoče obdelati.", {}, response.status);
   }
@@ -64,4 +64,9 @@ export function saveQualityCheck(batchId: number, data: QualityInput): Promise<Q
 }
 export function releaseBatch(batchId: number): Promise<Batch> {
   return request(`/batches/${batchId}/release`, { method: "POST" });
+}
+export function rejectBatch(batchId: number, decisionNote: string): Promise<Batch> {
+  return request(`/batches/${batchId}/reject`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision_note: decisionNote }),
+  });
 }

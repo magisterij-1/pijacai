@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { getQuality, releaseBatch, saveQualityCheck } from "../src/api/quality";
+import { getQuality, rejectBatch, releaseBatch, saveQualityCheck } from "../src/api/quality";
 import { readToken, saveToken, unauthorizedEvent } from "../src/api/auth";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -48,7 +48,7 @@ it.each([403, 404, 409])("ohrani poslovno napako %s", async status => {
   await expect(saveQualityCheck(42, { parameter_id: 3, value: "3" })).rejects.toMatchObject({ status, message: "Meritev ni dovoljena." });
 });
 
-it.each([getQuality.bind(null, 42), () => saveQualityCheck(42, { parameter_id: 3, value: "3" }), () => releaseBatch(42)])("ob 401 odstrani žeton in sproži odjavo", async action => {
+it.each([getQuality.bind(null, 42), () => saveQualityCheck(42, { parameter_id: 3, value: "3" }), () => releaseBatch(42), () => rejectBatch(42, "Neustrezna vrednost pH.")])("ob 401 odstrani žeton in sproži odjavo", async action => {
   respond({ detail: "Prijava ni veljavna." }, 401);
   const listener = vi.fn(); window.addEventListener(unauthorizedEvent, listener);
   try {
@@ -88,4 +88,25 @@ it.each(["QUALITY_NOT_PASSED", "NO_QUALITY_PARAMETERS"])("ohrani strukturirano n
 it.each([403, 404, 409])("ohrani status in sporočilo napake sprostitve %s", async status => {
   respond({ detail: "Sprostitev ni dovoljena." }, status);
   await expect(releaseBatch(42)).rejects.toMatchObject({ status, message: "Sprostitev ni dovoljena." });
+});
+
+it("zavrnitev pošlje razlog z JWT in vrne shranjeno odločitev", async () => {
+  const result = { id: 42, status: "rejected", decision_note: "Neustrezna vrednost pH.", decided_by: 8 };
+  respond(result);
+  expect(await rejectBatch(42, "Neustrezna vrednost pH.")).toEqual(result);
+  const [url, options] = fetchMock.mock.calls[0];
+  expect(url).toBe(`${base}/batches/42/reject`);
+  expect(options?.method).toBe("POST");
+  expect(JSON.parse(options?.body as string)).toEqual({ decision_note: "Neustrezna vrednost pH." });
+  expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer quality-token");
+});
+
+it("napako razloga 422 prikaže ob decision_note", async () => {
+  respond({ detail: [{ loc: ["body", "decision_note"], type: "string_too_short", msg: "too short" }] }, 422);
+  await expect(rejectBatch(42, "kratko")).rejects.toMatchObject({ status: 422, fields: { decision_note: "Preveri vneseno vrednost." } });
+});
+
+it.each([403, 404, 409])("ohrani status in sporočilo napake zavrnitve %s", async status => {
+  respond({ detail: "Zavrnitev ni dovoljena." }, status);
+  await expect(rejectBatch(42, "Neustrezna vrednost pH.")).rejects.toMatchObject({ status, message: "Zavrnitev ni dovoljena." });
 });
