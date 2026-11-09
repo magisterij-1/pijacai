@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from app.models import BatchStatus
 from app.schemas.inventory import Quantity, RecordId
@@ -18,6 +18,20 @@ class BatchStart(BaseModel):
     model_config = ConfigDict(extra="forbid")
     line_id: RecordId
     qty: Quantity
+
+
+class BatchFinish(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    produced_qty: int = Field(strict=True, ge=0, le=2147483647)
+    rejected_qty: int = Field(strict=True, ge=0, le=2147483647)
+
+    @field_validator("rejected_qty")
+    @classmethod
+    def reject_excess_waste(cls, value: int, info: ValidationInfo) -> int:
+        produced = info.data.get("produced_qty")
+        if produced is not None and value > produced:
+            raise ValueError("Izmet ne sme presegati proizvedene količine.")
+        return value
 
 
 class StockRequirement(BaseModel):

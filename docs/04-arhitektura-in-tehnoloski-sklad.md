@@ -56,7 +56,7 @@ Primeri pomembnejših končnih točk (načrt):
 | `GET /lookup/lines` | Aktivne proizvodne linije | operater |
 | `GET /batches` | Pregled šarž z možnostjo filtra po nalogu ali stanju | operater, planer, kontrolor |
 | `GET /batches/{id}` | Podrobnosti šarže z odpisano porabo po serijah | operater, planer, kontrolor |
-| `POST /batches/{id}/finish` | Konec polnjenja, v kontrolo | operater |
+| `POST /batches/{id}/finish` | Vnos proizvedene količine in izmeta, prehod iz in_production v awaiting_qc | operater, ki je šaržo zagnal |
 | `POST /batches/{id}/checks` | Vnos meritev | kontrolor |
 | `POST /batches/{id}/release` | Sprostitev šarže | kontrolor |
 | `POST /batches/{id}/reject` | Zavrnitev z razlogom | kontrolor |
