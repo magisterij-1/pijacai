@@ -1,3 +1,4 @@
+# — prejemi, validacija in podvojene serije.
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from decimal import Decimal

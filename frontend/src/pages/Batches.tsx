@@ -1,3 +1,4 @@
+// — seznam/podrobnosti šarž in zaključek polnjenja.
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { User } from "../api/auth";

@@ -1,3 +1,4 @@
+// — zahtevki za prejeme, šifrante in zaloge.
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { getStock, InventoryApiError, listMaterialLots, listMaterials, listSuppliers, receiveMaterial } from "../src/api/inventory";

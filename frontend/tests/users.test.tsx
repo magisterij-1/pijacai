@@ -1,3 +1,4 @@
+// — obrazec in prikaz upravljanja uporabnikov.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";

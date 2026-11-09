@@ -1,3 +1,4 @@
+// — izbor serije in prikaz povezanih šarž.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";

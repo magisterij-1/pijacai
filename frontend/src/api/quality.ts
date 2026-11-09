@@ -1,3 +1,4 @@
+// — pregled/shranjevanje meritev ter odločitve o šarži.
 import { authenticatedRequest } from "./auth";
 import type { Batch } from "./batches";
 

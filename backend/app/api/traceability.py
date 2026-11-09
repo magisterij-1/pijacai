@@ -1,3 +1,4 @@
+# — sledljivost šarž in serij v obeh smereh.
 from decimal import Decimal
 from typing import Annotated
 

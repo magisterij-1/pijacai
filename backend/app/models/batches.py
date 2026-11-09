@@ -1,3 +1,4 @@
+# — proizvodna linija, šarža in poraba serij.
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum

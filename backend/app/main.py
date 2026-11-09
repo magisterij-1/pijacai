@@ -1,3 +1,4 @@
+# — FastAPI aplikacija, usmerjevalniki, CORS in napake.
 import os
 
 from fastapi import FastAPI, HTTPException, Request

@@ -1,3 +1,4 @@
+<!-- — relacijska baza in povezave za sledljivost. -->
 # Relacijska podatkovna baza za sledljivost šarž
 
 **Status:** Proposed

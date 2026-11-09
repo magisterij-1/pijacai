@@ -1,3 +1,4 @@
+// — linije, zagon, seznam in zaključek šarž.
 import { authenticatedRequest } from "./auth";
 
 export type Line = { id: number; name: string };

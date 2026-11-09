@@ -1,3 +1,4 @@
+<!-- — transakcijski FIFO odpis zaloge. -->
 # Transakcijska poraba zaloge po načelu FIFO
 
 **Status:** Proposed

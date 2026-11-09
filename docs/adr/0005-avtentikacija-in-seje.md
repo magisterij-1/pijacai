@@ -1,3 +1,4 @@
+<!-- — starejša odločitev o sejah; nadomeščena z 0007. -->
 # Seja na strežniku za prijavo uporabnikov
 
 **Status:** Superseded by [ADR 0007 – Prijava z JWT in preverjanje uporabnika na backendu](0007-jwt-avtentikacija.md)

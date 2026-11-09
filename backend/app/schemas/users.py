@@ -1,3 +1,4 @@
+# — vhodni podatki za ustvarjanje uporabnikov.
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator

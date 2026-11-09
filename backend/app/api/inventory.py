@@ -1,3 +1,4 @@
+# — evidentiranje prejemov in izbor šifrantov.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError

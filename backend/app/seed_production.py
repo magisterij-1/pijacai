@@ -1,3 +1,4 @@
+# — demonstracijski izdelek z recepturo.
 """Ročna priprava demonstracijskega izdelka in recepture; brez nalogov ali porabe."""
 from decimal import Decimal
 

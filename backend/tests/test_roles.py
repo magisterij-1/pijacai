@@ -1,3 +1,4 @@
+# — pravila dostopa in seznam zaščitenih poti.
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 

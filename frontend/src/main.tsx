@@ -1,3 +1,4 @@
+// — zagon Reacta, prijavna seja in odjava.
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { LoginResult } from "./api/auth";

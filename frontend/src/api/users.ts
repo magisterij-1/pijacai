@@ -1,3 +1,4 @@
+// — ustvarjanje, seznam in deaktivacija uporabnikov.
 import { authenticatedRequest } from "./auth";
 import type { Role, User } from "./auth";
 

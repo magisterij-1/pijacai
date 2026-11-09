@@ -1,3 +1,4 @@
+# — priprava začetnih proizvodnih linij.
 """Ročna priprava začetnih linij; obstoječih linij ne aktivira ponovno."""
 from sqlalchemy import select
 

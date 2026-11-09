@@ -1,3 +1,4 @@
+// — prijavni obrazec in napake prijave.
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { login } from "../api/auth";

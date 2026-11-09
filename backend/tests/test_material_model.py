@@ -1,3 +1,4 @@
+# — podatkovne omejitve materialov in serij.
 from decimal import Decimal
 from uuid import uuid4
 

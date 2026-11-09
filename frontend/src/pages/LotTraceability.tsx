@@ -1,3 +1,4 @@
+// — sledljivost materialne serije do povezanih šarž.
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { Material } from "../api/inventory";

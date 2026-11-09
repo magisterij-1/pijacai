@@ -1,3 +1,4 @@
+// — meritve, zgodovina, sprostitev in zavrnitev.
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { Batch } from "../api/batches";

@@ -1,3 +1,4 @@
+# — predogled recepture in podatki proizvodnega naloga.
 from datetime import date
 from decimal import Decimal
 from typing import Annotated

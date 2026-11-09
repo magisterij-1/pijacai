@@ -1,3 +1,4 @@
+# — preverjanje prijave, aktivnosti in vlog.
 from dataclasses import dataclass
 
 import jwt

@@ -1,3 +1,4 @@
+// — obrazec za prejem surovin in embalaže.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";

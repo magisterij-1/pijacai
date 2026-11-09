@@ -1,3 +1,4 @@
+// — iskanje šarže in preklapljanje smeri.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";

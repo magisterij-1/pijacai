@@ -1,3 +1,4 @@
+# — predogled, ustvarjanje, seznam in odpoved nalogov.
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status

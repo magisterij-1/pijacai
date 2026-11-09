@@ -1,3 +1,4 @@
+// — današnji datum v časovnem pasu Europe/Ljubljana.
 export function businessToday(): string {
   const parts = new Intl.DateTimeFormat("en", {
     timeZone: "Europe/Ljubljana", year: "numeric", month: "2-digit", day: "2-digit",

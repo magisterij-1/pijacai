@@ -1,3 +1,4 @@
+// — zahtevki API za uporabnike.
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createUser, deactivateUser, listUsers, UserApiError } from "../src/api/users";

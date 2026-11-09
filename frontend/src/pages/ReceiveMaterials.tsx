@@ -1,3 +1,4 @@
+// — vnos prejemov surovin in embalaže.
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { InventoryApiError, listMaterialLots, listMaterials, listSuppliers, receiveMaterial } from "../api/inventory";

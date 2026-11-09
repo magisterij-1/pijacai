@@ -1,3 +1,4 @@
+# — povezava Alembica z bazo in modeli.
 from alembic import context
 
 from app.database import Base, engine

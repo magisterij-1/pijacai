@@ -1,3 +1,4 @@
+// — meritve, zgodovina in odločitveni obrazci.
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";

@@ -1,3 +1,4 @@
+// — prejemi, šifranti in pregled zalog.
 import { authenticatedRequest } from "./auth";
 
 export type Material = { id: number; name: string; type: "ingredient" | "packaging"; unit: string };

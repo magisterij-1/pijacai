@@ -1,3 +1,4 @@
+# — parametri kakovosti in zgodovina meritev.
 """Parametri kakovosti in zgodovina meritev.
 
 Revision ID: 0005_quality_measurements

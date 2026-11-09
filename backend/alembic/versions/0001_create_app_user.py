@@ -1,3 +1,4 @@
+# — tabela uporabnikov in dovoljene vloge.
 """Ustvari tabelo uporabnikov.
 
 Revision ID: 0001_create_app_user

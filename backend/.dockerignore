@@ -1,3 +1,4 @@
+# — izključitve pri gradnji backend slike.
 __pycache__/
 *.py[cod]
 .venv/
