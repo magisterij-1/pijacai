@@ -72,6 +72,9 @@ class BatchSummary(BaseModel):
     rejected_qty: int
     started_at: datetime
     finished_at: datetime | None
+    decided_by: int | None
+    decided_at: datetime | None
+    decision_note: str | None
 
 
 class ConsumptionOut(BaseModel):
