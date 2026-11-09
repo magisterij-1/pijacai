@@ -17,6 +17,7 @@ export type Batch = {
   status: "in_production" | "awaiting_qc" | "released" | "rejected";
   planned_qty: string; produced_qty: number; rejected_qty: number; started_at: string; finished_at: string | null;
   consumptions: Consumption[];
+  decided_by: number | null; decided_at: string | null; decision_note: string | null;
 };
 export type BatchSummary = Omit<Batch, "consumptions">;
 export type BatchFinishInput = { produced_qty: number; rejected_qty: number };
