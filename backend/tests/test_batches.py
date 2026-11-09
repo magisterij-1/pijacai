@@ -153,6 +153,129 @@ def test_next_batch_can_start_on_in_progress_order_with_unique_sequence(batch_cl
     assert counts(db, data)[0] == 2
 
 
+@pytest.mark.parametrize("quantity,used,remaining", [
+    ("10", "0.800", "29.200"),
+    ("375", "30.000", "0.000"),
+])
+def test_fifo_uses_only_oldest_lot_when_it_is_sufficient(batch_client, quantity, used, remaining):
+    client, db, data = batch_client
+    response = client.post(start_path(data), headers=auth(data.operator), json=payload(data, qty=quantity))
+    assert response.status_code == 201
+    consumption = {item["material_lot_id"]: Decimal(item["qty"]) for item in response.json()["consumptions"]}
+    assert consumption == {data.lots[1].id: Decimal(used), data.lots[3].id: Decimal(quantity)}
+    db.refresh(data.lots[1])
+    db.refresh(data.lots[2])
+    assert data.lots[1].remaining_qty == Decimal(remaining)
+    assert data.lots[2].remaining_qty == Decimal("60")
+    assert counts(db, data) == (1, 2)
+
+
+def test_fifo_prioritizes_receipt_time_over_lot_id(batch_client):
+    client, db, data = batch_client
+    old, new = data.lots[1:3]
+    assert old.id < new.id
+    new.received_at = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    db.commit()
+    response = client.post(start_path(data), headers=auth(data.operator), json=payload(data))
+    assert response.status_code == 201
+    used = {item["material_lot_id"]: Decimal(item["qty"]) for item in response.json()["consumptions"]}
+    assert used == {new.id: Decimal("40"), data.lots[3].id: Decimal("500")}
+    db.refresh(old)
+    db.refresh(new)
+    assert old.remaining_qty == Decimal("30")
+    assert new.remaining_qty == Decimal("20")
+
+
+def test_fifo_breaks_equal_receipt_times_by_lot_id(batch_client):
+    client, db, data = batch_client
+    old, new = data.lots[1:3]
+    new.received_at = old.received_at
+    db.commit()
+    assert old.id < new.id
+    response = client.post(start_path(data), headers=auth(data.operator), json=payload(data))
+    assert response.status_code == 201
+    used = {item["material_lot_id"]: Decimal(item["qty"]) for item in response.json()["consumptions"]}
+    assert used == {old.id: Decimal("30"), new.id: Decimal("10"), data.lots[3].id: Decimal("500")}
+
+
+def test_fifo_consumes_remaining_quantity_instead_of_received_quantity(batch_client):
+    client, db, data = batch_client
+    old, new = data.lots[1:3]
+    old.remaining_qty = Decimal("7.125")
+    db.commit()
+    response = client.post(start_path(data), headers=auth(data.operator), json=payload(data, qty="100"))
+    assert response.status_code == 201
+    used = {item["material_lot_id"]: Decimal(item["qty"]) for item in response.json()["consumptions"]}
+    assert used == {old.id: Decimal("7.125"), new.id: Decimal("0.875"), data.lots[3].id: Decimal("100")}
+    db.refresh(old)
+    db.refresh(new)
+    assert old.remaining_qty == 0
+    assert old.received_qty == Decimal("30")
+    assert new.remaining_qty == Decimal("59.125")
+
+
+def test_start_accepts_exactly_available_ingredient_quantity(batch_client):
+    client, db, data = batch_client
+    response = client.post(start_path(data), headers=auth(data.operator), json=payload(data, qty="1125"))
+    assert response.status_code == 201
+    used = {item["material_lot_id"]: Decimal(item["qty"]) for item in response.json()["consumptions"]}
+    assert used == {data.lots[1].id: Decimal("30"), data.lots[2].id: Decimal("60"), data.lots[3].id: Decimal("1125")}
+    for lot in data.lots:
+        db.refresh(lot)
+    assert [lot.remaining_qty for lot in data.lots] == [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("375")]
+
+
+@pytest.mark.parametrize("preview_first", [False, True])
+def test_packaging_shortage_keeps_sufficient_ingredients_unchanged(batch_client, preview_first):
+    client, db, data = batch_client
+    if preview_first:
+        preview = client.post(start_path(data) + "/preview", headers=auth(data.operator), json=payload(data))
+        assert preview.status_code == 200
+        assert preview.json()["can_start"] is True
+    data.lots[3].remaining_qty = Decimal("499.999")
+    db.commit()
+    response = client.post(start_path(data), headers=auth(data.operator), json=payload(data))
+    assert response.status_code == 409
+    missing = response.json()["detail"]["missing"]
+    assert len(missing) == 1
+    assert missing[0]["material_id"] == data.packaging.id
+    assert Decimal(missing[0]["missing_qty"]) == Decimal("0.001")
+    assert counts(db, data) == (0, 0)
+    db.refresh(data.order)
+    assert data.order.status == OrderStatus.planned
+    for lot in data.lots:
+        db.refresh(lot)
+    assert [lot.remaining_qty for lot in data.lots] == [Decimal("0"), Decimal("30"), Decimal("60"), Decimal("499.999")]
+
+
+def test_repeated_starts_conserve_stock_and_record_recipe_totals_per_batch(batch_client):
+    client, db, data = batch_client
+    before = {lot.id: (lot.remaining_qty, lot.received_qty) for lot in data.lots}
+    consumed = {lot.id: Decimal("0") for lot in data.lots}
+    for quantity, expected in [("250", {data.material.id: Decimal("20"), data.packaging.id: Decimal("250")}),
+                               ("500", {data.material.id: Decimal("40"), data.packaging.id: Decimal("500")})]:
+        response = client.post(start_path(data), headers=auth(data.operator), json=payload(data, qty=quantity))
+        assert response.status_code == 201
+        batch_id = response.json()["id"]
+        rows = db.execute(select(MaterialLot.material_id, BatchConsumption.material_lot_id, BatchConsumption.qty)
+                          .join(MaterialLot, MaterialLot.id == BatchConsumption.material_lot_id)
+                          .where(BatchConsumption.batch_id == batch_id)).all()
+        totals = {}
+        for material_id, lot_id, quantity_used in rows:
+            assert quantity_used > 0
+            totals[material_id] = totals.get(material_id, Decimal("0")) + quantity_used
+            consumed[lot_id] += quantity_used
+        assert totals == expected
+        assert len(rows) == len({lot_id for _, lot_id, _ in rows})
+    assert counts(db, data) == (2, 5)
+    for lot in data.lots:
+        db.refresh(lot)
+        remaining_before, received_before = before[lot.id]
+        assert lot.remaining_qty >= 0
+        assert lot.remaining_qty + consumed[lot.id] == remaining_before
+        assert lot.received_qty == received_before
+
+
 @pytest.mark.parametrize("state", [OrderStatus.cancelled, OrderStatus.done])
 def test_invalid_order_state_cannot_start_batch(batch_client, state):
     client, db, data = batch_client
