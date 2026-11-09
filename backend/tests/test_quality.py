@@ -269,3 +269,231 @@ def test_check_commit_failure_rolls_back_and_allows_retry(quality_client):
     assert data.batch.status == BatchStatus.awaiting_qc
     assert client.post(path(data), headers=auth(data.quality), json=body).status_code == 201
     assert count(db, data) == 1
+
+
+def release_path(data):
+    return f"/api/batches/{data.batch.id}/release"
+
+
+def measure(client, data, parameter, value):
+    response = client.post(path(data), headers=auth(data.quality), json={"parameter_id": parameter.id, "value": value})
+    assert response.status_code == 201
+    return response.json()
+
+
+def passing_checks(client, data):
+    measure(client, data, data.ph, "3")
+    measure(client, data, data.co2, "0.5")
+
+
+def assert_undecided(db, data):
+    db.refresh(data.batch)
+    assert data.batch.status == BatchStatus.awaiting_qc
+    assert data.batch.decided_by is None
+    assert data.batch.decided_at is None
+    assert data.batch.decision_note is None
+
+
+def test_release_records_decision_and_removes_batch_from_quality_queue(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    before = datetime.now(timezone.utc)
+    response = client.post(release_path(data), headers=auth(data.quality))
+    assert response.status_code == 200
+    result = response.json()
+    assert result["id"] == data.batch.id
+    assert result["status"] == "released"
+    assert result["decided_by"] == data.quality.id
+    assert before <= datetime.fromisoformat(result["decided_at"]) <= datetime.now(timezone.utc)
+    assert result["decision_note"] is None
+    assert result["produced_qty"] == 980 and result["rejected_qty"] == 5
+    db.refresh(data.batch)
+    assert data.batch.status == BatchStatus.released
+    assert data.batch.decided_by == data.quality.id
+    assert data.batch.decided_at is not None
+    assert client.get(f"/api/batches/{data.batch.id}", headers=auth(data.quality)).json() == result
+    queue = client.get("/api/batches", headers=auth(data.quality), params={"order_id": data.order.id, "status_filter": "awaiting_qc"})
+    assert queue.status_code == 200 and queue.json() == []
+    released = client.get("/api/batches", headers=auth(data.quality), params={"order_id": data.order.id, "status_filter": "released"})
+    assert released.status_code == 200
+    assert released.json()[0]["decided_by"] == data.quality.id
+    assert count(db, data) == 2
+    db.refresh(data.order)
+    assert data.order.status == OrderStatus.in_progress
+
+
+@pytest.mark.parametrize("mode", ["all_missing", "some_missing", "mixed", "invalid"])
+def test_release_reports_missing_and_invalid_parameters_without_decision(quality_client, mode):
+    client, db, data = quality_client
+    if mode == "some_missing":
+        measure(client, data, data.ph, "3")
+    elif mode in ("mixed", "invalid"):
+        measure(client, data, data.ph, "5")
+        if mode == "invalid":
+            measure(client, data, data.co2, "2")
+    response = client.post(release_path(data), headers=auth(data.quality))
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["code"] == "QUALITY_NOT_PASSED"
+    expected_missing = {"all_missing": [data.ph, data.co2], "some_missing": [data.co2], "mixed": [data.co2], "invalid": []}[mode]
+    expected_invalid = {"all_missing": [], "some_missing": [], "mixed": [data.ph], "invalid": [data.ph, data.co2]}[mode]
+    assert detail["missing"] == [{"parameter_id": parameter.id, "name": parameter.name} for parameter in expected_missing]
+    assert detail["invalid"] == [{"parameter_id": parameter.id, "name": parameter.name} for parameter in expected_invalid]
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("values,expected_status", [(('5', '3'), 200), (('3', '5'), 422)])
+def test_release_uses_latest_check_in_both_directions(quality_client, values, expected_status):
+    client, db, data = quality_client
+    for value in values:
+        measure(client, data, data.ph, value)
+    measure(client, data, data.co2, "0")
+    response = client.post(release_path(data), headers=auth(data.quality))
+    assert response.status_code == expected_status
+    assert count(db, data) == 3
+    if expected_status == 422:
+        assert response.json()["detail"]["invalid"] == [{"parameter_id": data.ph.id, "name": "pH"}]
+        assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("values,expected_status", [(('5', '3'), 200), (('3', '5'), 422)])
+def test_release_breaks_equal_check_times_by_highest_id(quality_client, values, expected_status):
+    client, db, data = quality_client
+    ids = [measure(client, data, data.ph, value)["id"] for value in values]
+    for check_id in ids:
+        db.get(QualityCheck, check_id).checked_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    db.commit()
+    measure(client, data, data.co2, "0.5")
+    assert client.post(release_path(data), headers=auth(data.quality)).status_code == expected_status
+
+
+def test_release_requires_measurements_for_newly_added_parameter(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    added = QualityParameter(product_id=data.product.id, name="Nivo polnjenja", unit="ml", min_value=Decimal("990"), max_value=Decimal("1010"))
+    db.add(added)
+    db.commit()
+    response = client.post(release_path(data), headers=auth(data.quality))
+    assert response.status_code == 422
+    assert response.json()["detail"]["missing"] == [{"parameter_id": added.id, "name": added.name}]
+    assert_undecided(db, data)
+
+
+def test_release_without_configured_parameters_is_rejected(quality_client):
+    client, db, data = quality_client
+    db.delete(data.ph)
+    db.delete(data.co2)
+    db.commit()
+    response = client.post(release_path(data), headers=auth(data.quality))
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "NO_QUALITY_PARAMETERS"
+    assert_undecided(db, data)
+
+
+def test_release_does_not_use_measurements_of_another_batch(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    other = Batch(batch_code=f"OTHER-QC-{uuid4().hex}", order_id=data.order.id, line_id=data.batch.line_id,
+                  operator_id=data.operator.id, production_date=data.batch.production_date, sequence_no=2,
+                  planned_qty=Decimal("100"), status=BatchStatus.awaiting_qc)
+    db.add(other)
+    db.commit()
+    response = client.post(f"/api/batches/{other.id}/release", headers=auth(data.quality))
+    assert response.status_code == 422
+    assert {item["parameter_id"] for item in response.json()["detail"]["missing"]} == {data.ph.id, data.co2.id}
+    db.refresh(other)
+    assert other.status == BatchStatus.awaiting_qc and other.decided_at is None
+
+
+def test_release_prioritizes_measurement_time_over_id(quality_client):
+    client, db, data = quality_client
+    newer = measure(client, data, data.ph, "3")
+    older = measure(client, data, data.ph, "5")
+    assert newer["id"] < older["id"]
+    db.get(QualityCheck, newer["id"]).checked_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    db.get(QualityCheck, older["id"]).checked_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    db.commit()
+    measure(client, data, data.co2, "0.5")
+    assert client.post(release_path(data), headers=auth(data.quality)).status_code == 200
+
+
+def test_release_can_be_decided_by_another_quality_user(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    data.operator.role = Role.quality
+    db.commit()
+    response = client.post(release_path(data), headers=auth(data.operator))
+    assert response.status_code == 200
+    assert response.json()["decided_by"] == data.operator.id
+
+
+@pytest.mark.parametrize("role", [Role.admin, Role.operator, Role.planner, Role.warehouse])
+def test_release_denies_other_roles(quality_client, role):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    data.operator.role = role
+    db.commit()
+    response = client.post(release_path(data), headers=auth(data.operator))
+    assert response.status_code == 403
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("case", ["missing", "invalid", "inactive"])
+def test_release_requires_active_login(quality_client, case):
+    client, db, data = quality_client
+    headers = {} if case == "missing" else {"Authorization": "Bearer invalid"}
+    if case == "inactive":
+        headers = auth(data.quality)
+        data.quality.active = False
+        db.commit()
+    assert client.post(release_path(data), headers=headers).status_code == 401
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("state", [BatchStatus.in_production, BatchStatus.released, BatchStatus.rejected])
+def test_release_denies_incorrect_state_without_overwriting_decision(quality_client, state):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    stamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    data.batch.status = state
+    data.batch.decided_by = data.quality.id
+    data.batch.decided_at = stamp
+    data.batch.decision_note = "Predhodna odločitev."
+    db.commit()
+    assert client.post(release_path(data), headers=auth(data.quality)).status_code == 409
+    db.refresh(data.batch)
+    assert data.batch.status == state
+    assert data.batch.decided_by == data.quality.id
+    assert data.batch.decided_at == stamp
+    assert data.batch.decision_note == "Predhodna odločitev."
+
+
+def test_repeated_release_is_409_and_new_measurement_is_blocked(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    first = client.post(release_path(data), headers=auth(data.quality))
+    assert first.status_code == 200
+    assert client.post(release_path(data), headers=auth(data.quality)).status_code == 409
+    attempt = client.post(path(data), headers=auth(data.quality), json={"parameter_id": data.ph.id, "value": "5"})
+    assert attempt.status_code == 409
+    saved = client.get(f"/api/batches/{data.batch.id}", headers=auth(data.quality))
+    assert saved.json() == first.json()
+    assert count(db, data) == 2
+
+
+def test_release_missing_batch_is_404(quality_client):
+    client, db, data = quality_client
+    missing = (db.scalar(select(func.max(Batch.id))) or 0) + 1
+    assert client.post(f"/api/batches/{missing}/release", headers=auth(data.quality)).status_code == 404
+    assert_undecided(db, data)
+
+
+def test_release_commit_failure_rolls_back_decision_and_preserves_checks(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    with patch.object(db, "commit", side_effect=RuntimeError("Simulirana napaka sprostitve")):
+        with pytest.raises(RuntimeError, match="Simulirana napaka sprostitve"):
+            client.post(release_path(data), headers=auth(data.quality))
+    assert_undecided(db, data)
+    assert count(db, data) == 2
+    assert client.post(release_path(data), headers=auth(data.quality)).status_code == 200

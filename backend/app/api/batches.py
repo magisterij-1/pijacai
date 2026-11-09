@@ -23,6 +23,7 @@ def summary(batch: Batch) -> BatchSummary:
         line_id=batch.line_id, line_name=batch.line.name, operator_id=batch.operator_id,
         status=batch.status, planned_qty=batch.planned_qty, produced_qty=batch.produced_qty, rejected_qty=batch.rejected_qty,
         started_at=batch.started_at, finished_at=batch.finished_at,
+        decided_by=batch.decided_by, decided_at=batch.decided_at, decision_note=batch.decision_note,
     )
 
 
