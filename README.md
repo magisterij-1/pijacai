@@ -1,5 +1,5 @@
 ﻿# Pijacai
-:)
+
 Pijacai je spletni sistem za vodenje proizvodnih šarž v manjši polnilnici pijač. Omogoča načrtovanje proizvodnih nalogov, evidentiranje surovin in njihove porabe, kontrolo kakovosti ter sledljivost med serijami surovin in končnimi šaržami.
 
 ## Tehnologije
@@ -46,6 +46,23 @@ docker compose down
 ```
 
 Podatki baze se ohranijo v Dockerjevem volumnu.
+
+## Demonstracijski podatki
+
+V zagnanem okolju pripravi šifrante, izdelek z recepturo, proizvodne linije in parametre kakovosti:
+
+```powershell
+docker compose exec backend python -m app.seed_inventory
+docker compose exec backend python -m app.seed_production
+docker compose exec backend python -m app.seed_lines
+docker compose exec backend python -m app.seed_quality
+```
+
+Skripte dodajo manjkajoče demonstracijske podatke. Obstoječe aktivne recepture in mej kakovosti ne spreminjajo.
+
+Kot administrator na strani **Uporabniki** ustvari račune za skladiščnika (`warehouse`), planerja (`planner`), operaterja (`operator`) in kontrolorja (`quality`). Prijavi se kot skladiščnik in prek **Prejem surovin** evidentiraj začetno zalogo; skripte zaloge ne ustvarijo.
+
+Osnovni potek: prejem surovin → proizvodni nalog → zagon šarže → zaključek polnjenja → meritve kakovosti → sprostitev ali zavrnitev → sledljivost.
 
 ## Dokumentacija
 
