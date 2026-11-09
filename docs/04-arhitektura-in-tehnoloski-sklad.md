@@ -62,6 +62,7 @@ Primeri pomembnejših končnih točk (načrt):
 | `POST /batches/{id}/release` | Sprostitev awaiting_qc šarže po uspešnih zadnjih meritvah vseh zahtevanih parametrov; napake 422 vsebujejo missing in invalid | kontrolor |
 | `POST /batches/{id}/reject` | Zavrnitev awaiting_qc šarže z obveznim razlogom decision_note (10–500 znakov po obrezu presledkov) | kontrolor |
 | `GET /traceability/batch/{id}` | Sledljivost nazaj | planer, kontrolor |
+| `GET /traceability/batch?batch_code=...` | Sledljivost po točni kodi šarže; vključuje vsote porabe po surovinah | planer, kontrolor |
 | `GET /traceability/lot/{id}` | Sledljivost naprej | planer, kontrolor |
 
 ### Podatkovna baza
