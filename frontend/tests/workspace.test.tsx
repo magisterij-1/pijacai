@@ -12,6 +12,7 @@ vi.mock("../src/pages/ReceiveMaterials", () => ({ ReceiveMaterials: () => null }
 vi.mock("../src/pages/Stock", () => ({ Stock: () => null }));
 vi.mock("../src/pages/Orders", () => ({ Orders: () => null }));
 vi.mock("../src/pages/Batches", () => ({ Batches: () => null }));
+vi.mock("../src/pages/Traceability", () => ({ Traceability: () => <p>Testni prikaz sledljivosti</p> }));
 
 // Pričakovanja iz US-03–US-15, ne iz konfiguracije navigacije.
 const permissions: Record<Role, string[]> = {
@@ -73,6 +74,7 @@ describe.each(roles)("Navigacija za %s", role => {
     render(role);
     const allowed = permissions[role].includes(path);
     expect(container.querySelector("h2")?.textContent).toBe(allowed ? title : "Nimate dostopa");
+    if (path === "/sledljivost") expect(container.textContent?.includes("Testni prikaz sledljivosti")).toBe(allowed);
     if (!allowed) {
       expect(container.querySelector(".role-badge")?.textContent).toBe("403");
       expect(container.querySelector(`nav a[href="#${path}"]`)).toBeNull();
