@@ -144,6 +144,7 @@ def test_existing_api_routes_have_an_explicit_access_policy():
         ("GET", "/api/batches/{batch_id}/checks"),
         ("POST", "/api/batches/{batch_id}/checks"),
         ("POST", "/api/batches/{batch_id}/release"),
+        ("POST", "/api/batches/{batch_id}/reject"),
         ("GET", "/api/batches"),
         ("GET", "/api/batches/{batch_id}"),
     }

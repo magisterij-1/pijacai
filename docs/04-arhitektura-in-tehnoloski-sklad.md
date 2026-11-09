@@ -60,7 +60,7 @@ Primeri pomembnejših končnih točk (načrt):
 | `POST /batches/{id}/checks` | Vnos meritev | kontrolor |
 | `GET /batches/{id}/checks` | Parametri izdelka z mejami, zadnjimi meritvami in zgodovino | kontrolor |
 | `POST /batches/{id}/release` | Sprostitev awaiting_qc šarže po uspešnih zadnjih meritvah vseh zahtevanih parametrov; napake 422 vsebujejo missing in invalid | kontrolor |
-| `POST /batches/{id}/reject` | Zavrnitev z razlogom | kontrolor |
+| `POST /batches/{id}/reject` | Zavrnitev awaiting_qc šarže z obveznim razlogom decision_note (10–500 znakov po obrezu presledkov) | kontrolor |
 | `GET /traceability/batch/{id}` | Sledljivost nazaj | planer, kontrolor |
 | `GET /traceability/lot/{id}` | Sledljivost naprej | planer, kontrolor |
 

@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.schemas.inventory import RecordId
 
@@ -11,6 +11,11 @@ class QualityCheckCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     parameter_id: RecordId
     value: Annotated[Decimal, Field(max_digits=12, decimal_places=3, allow_inf_nan=False)]
+
+
+class BatchReject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision_note: Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=10, max_length=500)]
 
 
 class QualityCheckOut(BaseModel):
