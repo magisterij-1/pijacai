@@ -18,7 +18,9 @@ export type Batch = {
   planned_qty: string; produced_qty: number; rejected_qty: number; started_at: string; finished_at: string | null;
   consumptions: Consumption[];
 };
-export type BatchFields = Partial<Record<keyof BatchStartInput, string>>;
+export type BatchSummary = Omit<Batch, "consumptions">;
+export type BatchFinishInput = { produced_qty: number; rejected_qty: number };
+export type BatchFields = Partial<Record<keyof BatchStartInput | keyof BatchFinishInput, string>>;
 
 export class BatchApiError extends Error {
   constructor(message: string, public fields: BatchFields = {}, public status?: number, public missing: StockRequirement[] = []) { super(message); }
@@ -41,11 +43,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       const fields: BatchFields = {};
       for (const item of body.detail) {
         const field: unknown = item.loc?.[item.loc.length - 1];
-        if (field === "line_id" || field === "qty") {
+        if (field === "line_id" || field === "qty" || field === "produced_qty" || field === "rejected_qty") {
           fields[field] = item.type === "value_error" && typeof item.msg === "string" ? item.msg : "Preveri vneseno vrednost.";
         }
       }
-      throw new BatchApiError("Preveri podatke za zagon šarže.", fields, 422);
+      throw new BatchApiError("Preveri podatke šarže.", fields, 422);
     }
     throw new BatchApiError(typeof body?.detail === "string" ? body.detail : "Zahtevek ni uspel. Poskusi znova.", {}, response.status);
   }
@@ -61,4 +63,14 @@ export function previewBatch(orderId: number, data: BatchStartInput, signal?: Ab
 }
 export function startBatch(orderId: number, data: BatchStartInput): Promise<Batch> {
   return request(`/orders/${orderId}/batches`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+}
+
+export function listBatches(status: Batch["status"], signal?: AbortSignal): Promise<BatchSummary[]> {
+  return request(`/batches?status_filter=${status}`, { signal, cache: "no-store" });
+}
+export function getBatch(batchId: number, signal?: AbortSignal): Promise<Batch> {
+  return request(`/batches/${batchId}`, { signal, cache: "no-store" });
+}
+export function finishBatch(batchId: number, data: BatchFinishInput): Promise<Batch> {
+  return request(`/batches/${batchId}/finish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { listLines, previewBatch, startBatch } from "../src/api/batches";
+import { finishBatch, getBatch, listBatches, listLines, previewBatch, startBatch } from "../src/api/batches";
 import { readToken, saveToken, unauthorizedEvent } from "../src/api/auth";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -49,10 +49,57 @@ it("natančno omejitev odpisa iz 422 prikaže ob količini", async () => {
   await expect(previewBatch(42, { line_id: 10, qty: "1" })).rejects.toMatchObject({ fields: { qty: msg }, status: 422 });
 });
 
+it.each(["in_production", "awaiting_qc"] as const)("seznam šarž filtrira po stanju %s", async status => {
+  respond([]);
+  const controller = new AbortController();
+  await listBatches(status, controller.signal);
+  const [url, options] = fetchMock.mock.calls[0];
+  expect(url).toBe(`${base}/batches?status_filter=${status}`);
+  expect(options?.signal).toBe(controller.signal);
+  expect(options?.cache).toBe("no-store");
+  expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer operator-token");
+});
+
+it("prebere podrobnosti s signalom in pošlje zaključek s celimi količinami", async () => {
+  respond({ id: 42 });
+  const controller = new AbortController();
+  await getBatch(42, controller.signal);
+  expect(fetchMock.mock.calls[0][0]).toBe(`${base}/batches/42`);
+  expect(fetchMock.mock.calls[0][1]?.signal).toBe(controller.signal);
+  expect(fetchMock.mock.calls[0][1]?.cache).toBe("no-store");
+  respond({ id: 42, status: "awaiting_qc" });
+  await finishBatch(42, { produced_qty: 480, rejected_qty: 5 });
+  const [url, options] = fetchMock.mock.calls[1];
+  expect(url).toBe(`${base}/batches/42/finish`);
+  expect(options?.method).toBe("POST");
+  expect(JSON.parse(options?.body as string)).toEqual({ produced_qty: 480, rejected_qty: 5 });
+  expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer operator-token");
+});
+
+it("napake zaključka 422 preslika na obe količini in prezre nedovoljene ključe", async () => {
+  const msg = "Izmet ne sme presegati proizvedene količine.";
+  respond({ detail: [
+    { loc: ["body", "produced_qty"], msg: "invalid", type: "int_type" },
+    { loc: ["body", "rejected_qty"], msg, type: "value_error" },
+    { loc: ["body", "status"], msg: "invalid", type: "extra_forbidden" },
+  ] }, 422);
+  await expect(finishBatch(42, { produced_qty: 10, rejected_qty: 11 })).rejects.toMatchObject({
+    status: 422, fields: { produced_qty: "Preveri vneseno vrednost.", rejected_qty: msg },
+  });
+});
+
+it.each([403, 404, 409])("ohrani status in sporočilo neuspešnega zaključka %s", async status => {
+  respond({ detail: "Zaključek ni dovoljen." }, status);
+  await expect(finishBatch(42, { produced_qty: 10, rejected_qty: 0 })).rejects.toMatchObject({ status, message: "Zaključek ni dovoljen." });
+});
+
 it.each([
   { name: "linije", action: () => listLines() },
   { name: "predogled", action: () => previewBatch(42, { line_id: 10, qty: "500" }) },
   { name: "zagon", action: () => startBatch(42, { line_id: 10, qty: "500" }) },
+  { name: "seznam šarž", action: () => listBatches("in_production") },
+  { name: "podrobnosti šarže", action: () => getBatch(42) },
+  { name: "zaključek", action: () => finishBatch(42, { produced_qty: 500, rejected_qty: 0 }) },
 ])("ob 401 sproži odjavo: $name", async ({ action }) => {
   respond({ detail: "Prijava ni veljavna." }, 401);
   const listener = vi.fn();
