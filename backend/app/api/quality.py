@@ -6,11 +6,32 @@ from app.api.batches import PathId, detail
 from app.api.dependencies import require_roles
 from app.database import get_db
 from app.models import Batch, BatchStatus, ProductionOrder, QualityCheck, QualityParameter, Role, User
-from app.schemas.quality import ParameterWithLatest, QualityCheckCreate, QualityCheckOut, QualityOverview
+from app.schemas.quality import BatchReject, ParameterWithLatest, QualityCheckCreate, QualityCheckOut, QualityOverview
 from app.schemas.batches import BatchDetail
 
 
 router = APIRouter(prefix="/api", tags=["Kakovost"])
+
+
+@router.post("/batches/{batch_id}/reject", response_model=BatchDetail)
+def reject_batch(batch_id: PathId, data: BatchReject, user: User = Depends(require_roles(Role.quality)), db: Session = Depends(get_db)):
+    try:
+        batch = db.scalar(select(Batch).where(Batch.id == batch_id).with_for_update().execution_options(populate_existing=True))
+        if batch is None:
+            raise HTTPException(status_code=404, detail="Šarža ni najdena.")
+        if batch.status != BatchStatus.awaiting_qc:
+            raise HTTPException(status_code=409, detail="Zavrniti je mogoče samo šaržo, ki čaka na kontrolo.")
+        batch.status = BatchStatus.rejected
+        batch.decision_note = data.decision_note
+        batch.decided_by = user.id
+        batch.decided_at = db.scalar(select(func.clock_timestamp()))
+        db.flush()
+        result = detail(db, batch)
+        db.commit()
+        return result
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/batches/{batch_id}/release", response_model=BatchDetail)

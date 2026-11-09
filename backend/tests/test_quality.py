@@ -497,3 +497,171 @@ def test_release_commit_failure_rolls_back_decision_and_preserves_checks(quality
     assert_undecided(db, data)
     assert count(db, data) == 2
     assert client.post(release_path(data), headers=auth(data.quality)).status_code == 200
+
+
+def reject_path(data):
+    return f"/api/batches/{data.batch.id}/reject"
+
+
+REJECTION_NOTE = "Vrednost pH presega dovoljeno mejo."
+
+
+@pytest.mark.parametrize("measurements", ["none", "partial", "failed", "passed"])
+def test_reject_records_decision_regardless_of_measurement_completion(quality_client, measurements):
+    client, db, data = quality_client
+    if measurements == "partial":
+        measure(client, data, data.ph, "3")
+    elif measurements == "failed":
+        measure(client, data, data.ph, "5")
+    elif measurements == "passed":
+        passing_checks(client, data)
+    check_count = count(db, data)
+    before = datetime.now(timezone.utc)
+    response = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": REJECTION_NOTE})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == "rejected"
+    assert result["decision_note"] == REJECTION_NOTE
+    assert result["decided_by"] == data.quality.id
+    assert before <= datetime.fromisoformat(result["decided_at"]) <= datetime.now(timezone.utc)
+    db.refresh(data.batch)
+    assert data.batch.status == BatchStatus.rejected
+    assert data.batch.decision_note == REJECTION_NOTE
+    assert data.batch.decided_by == data.quality.id
+    assert data.batch.decided_at is not None
+    assert (data.batch.produced_qty, data.batch.rejected_qty) == (980, 5)
+    assert count(db, data) == check_count
+    db.refresh(data.order)
+    assert data.order.status == OrderStatus.in_progress
+    queue = client.get("/api/batches", headers=auth(data.quality), params={"order_id": data.order.id, "status_filter": "awaiting_qc"})
+    assert queue.status_code == 200 and queue.json() == []
+    # Vse tri dovoljene bralne vloge morajo videti isti shranjeni razlog.
+    for role in (Role.operator, Role.planner, Role.quality):
+        data.operator.role = role
+        db.commit()
+        read = client.get(f"/api/batches/{data.batch.id}", headers=auth(data.operator))
+        assert read.status_code == 200 and read.json() == result
+
+
+@pytest.mark.parametrize("note", ["", "   \t\n    ", "kratko", "123456789", "a" * 501, None, 123, True, [], {}])
+def test_invalid_rejection_reason_has_field_error_without_changes(quality_client, note):
+    client, db, data = quality_client
+    response = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": note})
+    assert response.status_code == 422
+    assert any(item["loc"] == ["body", "decision_note"] for item in response.json()["detail"])
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("note,expected", [
+    ("1234567890", "1234567890"),
+    ("ž" * 500, "ž" * 500),
+    ("  " + REJECTION_NOTE + " \n", REJECTION_NOTE),
+    ("  " + "a" * 500 + "  ", "a" * 500),
+])
+def test_rejection_accepts_boundaries_and_trims_reason(quality_client, note, expected):
+    client, db, data = quality_client
+    response = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": note})
+    assert response.status_code == 200
+    assert response.json()["decision_note"] == expected
+    db.refresh(data.batch)
+    assert data.batch.decision_note == expected
+
+
+def test_rejection_requires_reason_field(quality_client):
+    client, db, data = quality_client
+    response = client.post(reject_path(data), headers=auth(data.quality), json={})
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "decision_note"]
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("field,value", [("decided_by", 123), ("decided_at", "2020-01-01T00:00:00Z"), ("status", "released")])
+def test_rejection_cannot_forge_author_time_or_status(quality_client, field, value):
+    client, db, data = quality_client
+    response = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": REJECTION_NOTE, field: value})
+    assert response.status_code == 422
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("role", [Role.operator, Role.planner, Role.warehouse, Role.admin])
+def test_rejection_denies_other_roles(quality_client, role):
+    client, db, data = quality_client
+    data.operator.role = role
+    db.commit()
+    response = client.post(reject_path(data), headers=auth(data.operator), json={"decision_note": REJECTION_NOTE})
+    assert response.status_code == 403
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("case", ["missing", "invalid", "inactive"])
+def test_rejection_requires_active_login(quality_client, case):
+    client, db, data = quality_client
+    headers = {} if case == "missing" else {"Authorization": "Bearer invalid"}
+    if case == "inactive":
+        headers = auth(data.quality)
+        data.quality.active = False
+        db.commit()
+    response = client.post(reject_path(data), headers=headers, json={"decision_note": REJECTION_NOTE})
+    assert response.status_code == 401
+    assert_undecided(db, data)
+
+
+@pytest.mark.parametrize("state", [BatchStatus.in_production, BatchStatus.released, BatchStatus.rejected])
+def test_rejection_denies_other_states_and_preserves_decision(quality_client, state):
+    client, db, data = quality_client
+    stamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    data.batch.status = state
+    data.batch.decided_by = data.quality.id
+    data.batch.decided_at = stamp
+    data.batch.decision_note = "Predhodna odločitev."
+    db.commit()
+    response = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": REJECTION_NOTE})
+    assert response.status_code == 409
+    db.refresh(data.batch)
+    assert data.batch.status == state
+    assert data.batch.decided_by == data.quality.id
+    assert data.batch.decided_at == stamp
+    assert data.batch.decision_note == "Predhodna odločitev."
+
+
+def test_rejected_batch_cannot_be_released_remeasured_or_rejected_again(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    first = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": REJECTION_NOTE})
+    assert first.status_code == 200
+    assert client.post(release_path(data), headers=auth(data.quality)).status_code == 409
+    assert client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": "Drug razlog zavrnitve."}).status_code == 409
+    assert client.post(path(data), headers=auth(data.quality), json={"parameter_id": data.ph.id, "value": "3"}).status_code == 409
+    read = client.get(f"/api/batches/{data.batch.id}", headers=auth(data.quality))
+    assert read.status_code == 200 and read.json() == first.json()
+    assert count(db, data) == 2
+
+
+def test_rejection_missing_batch_is_404(quality_client):
+    client, db, data = quality_client
+    missing = (db.scalar(select(func.max(Batch.id))) or 0) + 1
+    response = client.post(f"/api/batches/{missing}/reject", headers=auth(data.quality), json={"decision_note": REJECTION_NOTE})
+    assert response.status_code == 404
+    assert_undecided(db, data)
+
+
+def test_rejection_does_not_require_configured_parameters(quality_client):
+    client, db, data = quality_client
+    db.delete(data.ph)
+    db.delete(data.co2)
+    db.commit()
+    response = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": REJECTION_NOTE})
+    assert response.status_code == 200
+    assert response.json()["status"] == "rejected"
+
+
+def test_rejection_commit_failure_rolls_back_and_preserves_measurements(quality_client):
+    client, db, data = quality_client
+    passing_checks(client, data)
+    with patch.object(db, "commit", side_effect=RuntimeError("Simulirana napaka zavrnitve")):
+        with pytest.raises(RuntimeError, match="Simulirana napaka zavrnitve"):
+            client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": REJECTION_NOTE})
+    assert_undecided(db, data)
+    assert count(db, data) == 2
+    retry = client.post(reject_path(data), headers=auth(data.quality), json={"decision_note": REJECTION_NOTE})
+    assert retry.status_code == 200
