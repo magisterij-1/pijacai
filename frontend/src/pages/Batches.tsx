@@ -4,6 +4,7 @@ import type { User } from "../api/auth";
 import { BatchApiError, finishBatch, getBatch, listBatches } from "../api/batches";
 import type { Batch, BatchFields, BatchSummary } from "../api/batches";
 import { formatDecimal } from "../quantities";
+import { QualityMeasurements } from "./QualityMeasurements";
 
 const statusNames: Record<Batch["status"], string> = {
   in_production: "V proizvodnji", awaiting_qc: "Čaka na kontrolo", released: "Sproščena", rejected: "Zavrnjena",
@@ -140,6 +141,8 @@ export function Batches({ user }: { user: User }) {
           <td>{item.material_name}</td><td>{item.supplier_name}</td><td>{item.supplier_lot_no}</td><td>{formatDecimal(item.qty)} {item.unit}</td>
         </tr>)}</tbody>
       </table></div>
+      {user.role === "quality" && <QualityMeasurements key={batch.id} batch={batch} onSaving={setSaving}
+        onConflict={message => { setActionError(message); refresh(); }} />}
       {user.role === "operator" && batch.status === "in_production" && (batch.operator_id === user.id
         ? <FinishBatch key={batch.id} batch={batch} onSaving={setSaving} onConflict={message => { setActionError(message); refresh(); }} onFinished={result => {
           setBatch(result); setActionError(""); setSuccess(`Šarža ${result.batch_code} je predana v kontrolo.`); setListVersion(value => value + 1);

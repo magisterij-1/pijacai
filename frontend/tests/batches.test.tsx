@@ -8,6 +8,8 @@ import { BatchApiError, finishBatch, getBatch, listBatches } from "../src/api/ba
 import type { Batch } from "../src/api/batches";
 import { Batches } from "../src/pages/Batches";
 
+vi.mock("../src/pages/QualityMeasurements", () => ({ QualityMeasurements: () => <p>Testni prikaz meritev kakovosti</p> }));
+
 vi.mock("../src/api/batches", async importOriginal => {
   const actual = await importOriginal<typeof import("../src/api/batches")>();
   return { ...actual, finishBatch: vi.fn(), getBatch: vi.fn(), listBatches: vi.fn() };
@@ -62,6 +64,7 @@ it("naloži samo aktivne šarže in odpre podrobnosti s porabo", async () => {
   expect(container.textContent).toContain("SER-1");
   expect(container.textContent).toContain("40 kg");
   expect(container.querySelector("form")).not.toBeNull();
+  expect(container.textContent).not.toContain("Testni prikaz meritev kakovosti");
   expect(document.activeElement).toBe(container.querySelector("#batch-detail-title"));
 });
 
@@ -113,6 +116,7 @@ it("kontrolor vidi čakalno vrsto in podrobnosti brez obrazca zaključka", async
   await render({ ...operator, id: 8, role: "quality" }); await open();
   expect(listBatches).toHaveBeenCalledWith("awaiting_qc", expect.any(AbortSignal));
   expect(container.querySelector('table[aria-label="Čakalna vrsta kontrole"]')).not.toBeNull();
+  expect(container.textContent).toContain("Testni prikaz meritev kakovosti");
   expect(container.textContent).toContain("Čaka na kontrolo");
   expect(container.querySelector("form")).toBeNull();
 });
