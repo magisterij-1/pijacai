@@ -138,7 +138,7 @@ Zahtevani parametri in meje za izdelek.
 | product_id | FK → product | |
 | name | besedilo | Brix*, pH, CO₂, nivo polnjenja |
 | unit | besedilo | |
-| min_value / max_value | število | dovoljeno območje |
+| min_value / max_value | decimal(12,3) | vključujoče dovoljeno območje, min_value ≤ max_value |
 
 *Brix (°Bx) je merska enota, ki pove, koliko gramov saharoze je v 100 gramih raztopine.
 
@@ -148,10 +148,12 @@ Zahtevani parametri in meje za izdelek.
 | id | PK | |
 | batch_id | FK → batch | |
 | parameter_id | FK → quality_parameter | |
-| value | število | izmerjena vrednost |
+| value | decimal(12,3) | končna izmerjena vrednost, brez tihega zaokroževanja v API |
 | passed | boolean | sistem izračuna iz mej |
 | checked_by | FK → app_user | |
-| checked_at | datum in čas | |
+| checked_at | datum in čas s časovnim pasom | |
+
+Ime parametra je enolično znotraj izdelka. Vsak ponovni vnos meritve ustvari nov zapis; za zadnjo meritev velja največji `checked_at`, ob izenačenju pa največji `id`. Pregled šarže vrne parametre njenega izdelka z zadnjo meritvijo ali `null` ter zgodovino meritev. API dovoli vnos samo kontrolorju za šaržo `awaiting_qc`; rezultat `passed`, kontrolor in čas se določijo na strežniku.
 
 ## 2. Povezave med entitetami
 

@@ -14,6 +14,7 @@ from app.api.inventory import router as inventory_router
 from app.api.stock import router as stock_router
 from app.api.orders import router as orders_router
 from app.api.batches import router as batches_router
+from app.api.quality import router as quality_router
 
 
 app = FastAPI(title="Pijacai API", version="0.1.0")
@@ -33,6 +34,7 @@ app.include_router(inventory_router)
 app.include_router(stock_router)
 app.include_router(orders_router)
 app.include_router(batches_router)
+app.include_router(quality_router)
 
 
 @app.exception_handler(RequestValidationError)

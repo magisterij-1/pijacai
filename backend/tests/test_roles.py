@@ -141,6 +141,8 @@ def test_existing_api_routes_have_an_explicit_access_policy():
         ("POST", "/api/orders/{order_id}/batches/preview"),
         ("POST", "/api/orders/{order_id}/batches"),
         ("POST", "/api/batches/{batch_id}/finish"),
+        ("GET", "/api/batches/{batch_id}/checks"),
+        ("POST", "/api/batches/{batch_id}/checks"),
         ("GET", "/api/batches"),
         ("GET", "/api/batches/{batch_id}"),
     }
