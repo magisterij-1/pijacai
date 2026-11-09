@@ -7,6 +7,7 @@ import { ReceiveMaterials } from "./ReceiveMaterials";
 import { Stock } from "./Stock";
 import { Orders } from "./Orders";
 import { Batches } from "./Batches";
+import { Traceability } from "./Traceability";
 
 export function Workspace({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [path, setPath] = useState(readPagePath);
@@ -52,6 +53,7 @@ export function Workspace({ user, onLogout }: { user: User; onLogout: () => void
           {page.path === "/prejem-surovin" && <ReceiveMaterials />}
           {page.path === "/zaloge" && <Stock />}
           {page.path === "/nalogi" && <Orders role={user.role} />}
+          {page.path === "/sledljivost" && <Traceability key={`${user.id}:${user.role}`} />}
           {(page.path === "/sarze" || page.path === "/kontrola-kakovosti") && <Batches key={`${user.id}:${user.role}`} user={user} />}
         </section>
       ) : (
