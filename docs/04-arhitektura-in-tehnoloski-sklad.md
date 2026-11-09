@@ -58,6 +58,7 @@ Primeri pomembnejših končnih točk (načrt):
 | `GET /batches/{id}` | Podrobnosti šarže z odpisano porabo po serijah | operater, planer, kontrolor |
 | `POST /batches/{id}/finish` | Vnos proizvedene količine in izmeta, prehod iz in_production v awaiting_qc | operater, ki je šaržo zagnal |
 | `POST /batches/{id}/checks` | Vnos meritev | kontrolor |
+| `GET /batches/{id}/checks` | Parametri izdelka z mejami, zadnjimi meritvami in zgodovino | kontrolor |
 | `POST /batches/{id}/release` | Sprostitev šarže | kontrolor |
 | `POST /batches/{id}/reject` | Zavrnitev z razlogom | kontrolor |
 | `GET /traceability/batch/{id}` | Sledljivost nazaj | planer, kontrolor |
