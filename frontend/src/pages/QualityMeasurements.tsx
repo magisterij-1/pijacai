@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { Batch } from "../api/batches";
-import { getQuality, QualityApiError, releaseBatch, saveQualityCheck } from "../api/quality";
+import { getQuality, QualityApiError, rejectBatch, releaseBatch, saveQualityCheck } from "../api/quality";
 import type { QualityFields, QualityOverview, ReleaseProblems } from "../api/quality";
 import { formatDecimal, milli } from "../quantities";
 
@@ -13,11 +13,12 @@ function measurement(raw: string) {
   return { normalized, scaled: milli(unsigned) * (normalized.startsWith("-") ? -1n : 1n) };
 }
 
-export function QualityMeasurements({ batch, onSaving, onConflict, onReleased }: {
+export function QualityMeasurements({ batch, onSaving, onConflict, onReleased, onRejected }: {
   batch: Pick<Batch, "id" | "status">;
   onSaving: (saving: boolean) => void;
   onConflict: (message: string) => void;
   onReleased: (batch: Batch) => void;
+  onRejected: (batch: Batch) => void;
 }) {
   const [overview, setOverview] = useState<QualityOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,9 @@ export function QualityMeasurements({ batch, onSaving, onConflict, onReleased }:
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState("");
   const [releaseProblems, setReleaseProblems] = useState<ReleaseProblems | null>(null);
   const pending = useRef(false);
   const active = useRef(true);
@@ -107,6 +111,34 @@ export function QualityMeasurements({ batch, onSaving, onConflict, onReleased }:
     }
   }
 
+  async function reject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending.current || batch.status !== "awaiting_qc") return;
+    const normalized = reason.trim();
+    const length = Array.from(normalized).length;
+    setReasonError(""); setError(""); setSuccess(""); setReleaseProblems(null);
+    if (length < 10 || length > 500) {
+      setReasonError("Razlog mora vsebovati od 10 do 500 znakov.");
+      return;
+    }
+    pending.current = true; setSaving(true); setRejecting(true); onSaving(true);
+    try {
+      const result = await rejectBatch(batch.id, normalized);
+      if (!active.current) return;
+      setReason(""); setSuccess("Šarža je uspešno zavrnjena."); onRejected(result);
+    } catch (error) {
+      if (!active.current) return;
+      setError(error instanceof Error ? error.message : "Zavrnitev šarže ni uspela.");
+      if (error instanceof QualityApiError) {
+        setReasonError(error.fields.decision_note ?? "");
+        if (error.status === 409 || error.status === 403 || error.status === 404) onConflict(error.message);
+      }
+    } finally {
+      pending.current = false;
+      if (active.current) { setSaving(false); setRejecting(false); onSaving(false); }
+    }
+  }
+
   return <section aria-labelledby="quality-title">
     <div className="workspace-header">
       <h4 id="quality-title">Meritve kakovosti</h4>
@@ -130,7 +162,7 @@ export function QualityMeasurements({ batch, onSaving, onConflict, onReleased }:
             <td>{item.latest_check ? (item.latest_check.passed ? "Ustreza" : "Ne ustreza") : "Ni izmerjeno"}</td>
           </tr>)}</tbody>
         </table></div>
-        {batch.status === "awaiting_qc" ? <form onSubmit={submit}>
+        {batch.status === "awaiting_qc" ? <form id="quality-measurement-form" onSubmit={submit}>
           <fieldset disabled={saving || loading}>
             <label htmlFor="quality-parameter">Parameter</label>
             <select id="quality-parameter" required value={parameterId} aria-invalid={Boolean(fields.parameter_id)}
@@ -146,7 +178,7 @@ export function QualityMeasurements({ batch, onSaving, onConflict, onReleased }:
               onChange={event => { setValue(event.target.value); setFields(current => ({ ...current, value: undefined })); setError(""); setSuccess(""); }} />
             {fields.value && <small id="quality-value-error" className="field-error" role="alert">{fields.value}</small>}
             {preview !== null && <p role="status">Predogled: {preview ? "ustreza" : "ne ustreza"}. Meritev še ni shranjena.</p>}
-            <button type="submit">{saving && !releasing ? "Shranjevanje …" : "Shrani meritev"}</button>
+            <button type="submit">{saving && !releasing && !rejecting ? "Shranjevanje …" : "Shrani meritev"}</button>
           </fieldset>
         </form> : <p>Meritve je mogoče vnašati samo za šaržo, ki čaka na kontrolo.</p>}
       </>}
@@ -170,5 +202,19 @@ export function QualityMeasurements({ batch, onSaving, onConflict, onReleased }:
         </table></div>
       </details>}
     </>}
+    {batch.status === "awaiting_qc" && <section aria-labelledby="reject-title">
+      <h4 id="reject-title">Zavrnitev šarže</h4>
+      <p>Šaržo lahko zavrneš tudi brez vseh meritev. Vnesi razlog z 10–500 znaki.</p>
+      <form id="quality-reject-form" onSubmit={reject}>
+        <fieldset disabled={saving}>
+          <label htmlFor="quality-reason">Razlog zavrnitve</label>
+          <textarea id="quality-reason" rows={4} required value={reason} aria-invalid={Boolean(reasonError)}
+            aria-describedby={reasonError ? "quality-reason-error" : undefined}
+            onChange={event => { setReason(event.target.value); setReasonError(""); setError(""); setSuccess(""); }} />
+          {reasonError && <small id="quality-reason-error" className="field-error" role="alert">{reasonError}</small>}
+          <button className="danger" type="submit">{rejecting ? "Zavračanje …" : "Zavrni šaržo"}</button>
+        </fieldset>
+      </form>
+    </section>}
   </section>;
 }

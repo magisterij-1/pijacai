@@ -4,13 +4,13 @@ import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Batch } from "../src/api/batches";
-import { getQuality, QualityApiError, releaseBatch, saveQualityCheck } from "../src/api/quality";
+import { getQuality, QualityApiError, rejectBatch, releaseBatch, saveQualityCheck } from "../src/api/quality";
 import type { QualityCheck, QualityOverview } from "../src/api/quality";
 import { QualityMeasurements } from "../src/pages/QualityMeasurements";
 
 vi.mock("../src/api/quality", async importOriginal => {
   const actual = await importOriginal<typeof import("../src/api/quality")>();
-  return { ...actual, getQuality: vi.fn(), saveQualityCheck: vi.fn(), releaseBatch: vi.fn() };
+  return { ...actual, getQuality: vi.fn(), saveQualityCheck: vi.fn(), releaseBatch: vi.fn(), rejectBatch: vi.fn() };
 });
 
 const overview: QualityOverview = {
@@ -25,6 +25,7 @@ let root: Root;
 let onSaving: ReturnType<typeof vi.fn>;
 let onConflict: ReturnType<typeof vi.fn>;
 let onReleased: ReturnType<typeof vi.fn>;
+let onRejected: ReturnType<typeof vi.fn>;
 const ready: QualityOverview = {
   ...overview, parameters: overview.parameters.map(item => ({ ...item, latest_check: { ...check, parameter_id: item.id, passed: true } })),
 };
@@ -41,15 +42,17 @@ beforeEach(() => {
   vi.mocked(getQuality).mockReset().mockResolvedValue(overview);
   vi.mocked(saveQualityCheck).mockReset().mockResolvedValue(check);
   vi.mocked(releaseBatch).mockReset().mockResolvedValue(released);
+  vi.mocked(rejectBatch).mockReset().mockResolvedValue({ ...released, status: "rejected", decision_note: "Neustrezna vrednost pH." });
   onSaving = vi.fn(); onConflict = vi.fn();
   onReleased = vi.fn();
+  onRejected = vi.fn();
   container = document.createElement("div"); document.body.append(container);
   root = createRoot(container);
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); });
 
 async function render(id = 6, status: Batch["status"] = "awaiting_qc") {
-  await act(async () => root.render(<QualityMeasurements batch={{ id, status }} onSaving={onSaving} onConflict={onConflict} onReleased={onReleased} />));
+  await act(async () => root.render(<QualityMeasurements batch={{ id, status }} onSaving={onSaving} onConflict={onConflict} onReleased={onReleased} onRejected={onRejected} />));
 }
 function button(text: string) { return Array.from(container.querySelectorAll("button")).find(item => item.textContent === text)!; }
 function select(value = "10") {
@@ -66,7 +69,7 @@ function value(value: string) {
   });
 }
 async function submit() {
-  await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+  await act(async () => { container.querySelector("#quality-measurement-form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
 }
 
 it("prikaže vse parametre, enote, meje in manjkajoče meritve", async () => {
@@ -163,9 +166,9 @@ it("napaka osvežitve po uspešnem shranjevanju ohrani potrditev", async () => {
   await submit();
   expect(container.textContent).toContain("Meritev pH je shranjena: ustreza.");
   expect(container.textContent).toContain("Osvežitev ni uspela.");
-  expect(container.querySelector("form")).toBeNull();
+  expect(container.querySelector("#quality-measurement-form")).toBeNull();
   await act(async () => button("Osveži meritve").click());
-  expect(container.querySelector("form")).not.toBeNull();
+  expect(container.querySelector("#quality-measurement-form")).not.toBeNull();
   expect(saveQualityCheck).toHaveBeenCalledOnce();
 });
 
@@ -177,7 +180,8 @@ it("ignorira pozno prispelo branje druge šarže", async () => {
   await render(9);
   await act(async () => resolve(overview));
   expect(container.textContent).toContain("Za izdelek ni določenih parametrov kakovosti.");
-  expect(container.querySelector("form")).toBeNull();
+  expect(container.querySelector("#quality-measurement-form")).toBeNull();
+  expect(container.querySelector("#quality-reject-form")).not.toBeNull();
 });
 
 it.each(["in_production", "released", "rejected"] as const)("stanje %s omogoča le pregled", async status => {
@@ -281,5 +285,96 @@ it("sproščena šarža ob ponovnem prikazu nima gumba ali obrazca meritve", asy
   vi.mocked(getQuality).mockResolvedValue(ready);
   await render(6, "released");
   expect(container.querySelector("form")).toBeNull();
+  expect(button("Sprosti šaržo")).toBeUndefined();
+});
+
+function reason(text: string) {
+  act(() => {
+    const control = container.querySelector<HTMLTextAreaElement>("#quality-reason")!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(control, text);
+    control.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+async function reject() {
+  await act(async () => { container.querySelector("#quality-reject-form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+}
+
+it.each(["", "   ", "kratko", "123456789", "a".repeat(501)])("zavrne neveljaven razlog dolžine %s", async text => {
+  await render(); reason(text); await reject();
+  expect(rejectBatch).not.toHaveBeenCalled();
+  expect(container.querySelector("#quality-reason-error")?.textContent).toBe("Razlog mora vsebovati od 10 do 500 znakov.");
+});
+
+it.each(["1234567890", "ž".repeat(500), "😀".repeat(500)])("dovoli robno dolžino razloga", async text => {
+  await render(); reason(text); await reject();
+  expect(rejectBatch).toHaveBeenCalledWith(6, text);
+  expect(onRejected).toHaveBeenCalledOnce();
+});
+
+it("zavrne brez meritev in obreže zunanje presledke razloga", async () => {
+  await render(); reason("  Neustrezna vrednost pH. \n"); await reject();
+  expect(rejectBatch).toHaveBeenCalledWith(6, "Neustrezna vrednost pH.");
+  expect(onRejected).toHaveBeenCalledWith(expect.objectContaining({ status: "rejected", decision_note: "Neustrezna vrednost pH." }));
+  expect(onSaving).toHaveBeenLastCalledWith(false);
+});
+
+it("dovoli zavrnitev tudi ob napaki nalaganja meritev", async () => {
+  vi.mocked(getQuality).mockRejectedValueOnce(new Error("Meritev ni mogoče prebrati."));
+  await render(); reason("Neustrezna embalaža izdelka."); await reject();
+  expect(rejectBatch).toHaveBeenCalledWith(6, "Neustrezna embalaža izdelka.");
+});
+
+it("dovoli zavrnitev pri praznem šifrantu parametrov", async () => {
+  vi.mocked(getQuality).mockResolvedValue({ batch_id: 6, parameters: [], checks: [] });
+  await render(); reason("Neustrezna embalaža izdelka."); await reject();
+  expect(rejectBatch).toHaveBeenCalledWith(6, "Neustrezna embalaža izdelka.");
+});
+
+it("ohrani razlog in prikaže napako API ob polju", async () => {
+  vi.mocked(rejectBatch).mockRejectedValueOnce(new QualityApiError("Preveri vnesene podatke.", { decision_note: "Razlog ni veljaven." }, 422));
+  await render(); reason("Neustrezna vrednost pH."); await reject();
+  expect(container.querySelector("#quality-reason-error")?.textContent).toBe("Razlog ni veljaven.");
+  expect(container.querySelector<HTMLTextAreaElement>("#quality-reason")!.value).toBe("Neustrezna vrednost pH.");
+  expect(onRejected).not.toHaveBeenCalled();
+});
+
+it.each([403, 404, 409])("ob zavrnitvi %s osveži stanje prek nadrejene strani", async status => {
+  vi.mocked(rejectBatch).mockRejectedValueOnce(new QualityApiError("Zavrnitev ni dovoljena.", {}, status));
+  await render(); reason("Neustrezna vrednost pH."); await reject();
+  expect(onConflict).toHaveBeenCalledWith("Zavrnitev ni dovoljena.");
+  expect(onRejected).not.toHaveBeenCalled();
+});
+
+it("med zavračanjem prepreči dvojni zahtevek, meritev in sprostitev", async () => {
+  let resolve!: (batch: Batch) => void;
+  vi.mocked(getQuality).mockResolvedValue(ready);
+  vi.mocked(rejectBatch).mockReturnValueOnce(new Promise<Batch>(done => { resolve = done; }));
+  await render(); select(); value("3"); reason("Neustrezna vrednost pH."); await reject(); await reject();
+  await submit(); await act(async () => button("Sprosti šaržo").click());
+  expect(rejectBatch).toHaveBeenCalledOnce();
+  expect(saveQualityCheck).not.toHaveBeenCalled(); expect(releaseBatch).not.toHaveBeenCalled();
+  expect(container.querySelector<HTMLFieldSetElement>("#quality-reject-form fieldset")!.disabled).toBe(true);
+  expect(button("Osveži meritve").disabled).toBe(true);
+  await act(async () => resolve({ ...released, status: "rejected", decision_note: "Neustrezna vrednost pH." }));
+});
+
+it.each(["measurement", "release"])("med akcijo %s prepreči zavrnitev", async operation => {
+  let resolve!: (value: QualityCheck & Batch) => void;
+  const pending = new Promise<QualityCheck & Batch>(done => { resolve = done; });
+  vi.mocked(getQuality).mockResolvedValue(ready);
+  if (operation === "measurement") vi.mocked(saveQualityCheck).mockReturnValueOnce(pending);
+  else vi.mocked(releaseBatch).mockReturnValueOnce(pending);
+  await render(); select(); value("3"); reason("Neustrezna vrednost pH.");
+  if (operation === "measurement") await submit();
+  else await act(async () => button("Sprosti šaržo").click());
+  await reject();
+  expect(rejectBatch).not.toHaveBeenCalled();
+  await act(async () => resolve({ ...released, ...check }));
+});
+
+it("zavrnjena šarža nima obrazcev ali gumba sprostitve", async () => {
+  await render(6, "rejected");
+  expect(container.querySelector("#quality-reject-form")).toBeNull();
+  expect(container.querySelector("#quality-measurement-form")).toBeNull();
   expect(button("Sprosti šaržo")).toBeUndefined();
 });

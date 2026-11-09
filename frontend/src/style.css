@@ -92,6 +92,7 @@ label {
 
 input,
 select,
+textarea,
 button {
   font: inherit;
   min-height: 2.75rem;
@@ -99,11 +100,21 @@ button {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.6rem;
   border: 1px solid #82969e;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.decision-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 button {
@@ -137,6 +148,7 @@ button.secondary:hover:not(:disabled) {
 
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
 button:focus-visible,
 a:focus-visible,
 h2:focus-visible {

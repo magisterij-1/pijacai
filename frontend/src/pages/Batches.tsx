@@ -135,6 +135,7 @@ export function Batches({ user }: { user: User }) {
       <p>Proizvedeno: {batch.produced_qty} {batch.product_unit} · Izmet: {batch.rejected_qty} {batch.product_unit}</p>
       {batch.finished_at && <p>Zaključeno: {new Date(batch.finished_at).toLocaleString("sl-SI")}</p>}
       {batch.decided_at && <p>Odločil kontrolor #{batch.decided_by} · {new Date(batch.decided_at).toLocaleString("sl-SI")}</p>}
+      {batch.decision_note && <p className="decision-note"><strong>Razlog zavrnitve:</strong> {batch.decision_note}</p>}
       <h4>Porabljene serije</h4>
       <div className="table-scroll"><table aria-label="Porabljene serije šarže">
         <thead><tr><th scope="col">Sestavina</th><th scope="col">Dobavitelj</th><th scope="col">Serija</th><th scope="col">Porabljeno</th></tr></thead>
@@ -145,6 +146,8 @@ export function Batches({ user }: { user: User }) {
       {user.role === "quality" && <QualityMeasurements key={batch.id} batch={batch} onSaving={setSaving}
         onConflict={message => { setActionError(message); refresh(); }} onReleased={result => {
           setBatch(result); setActionError(""); setSuccess(`Šarža ${result.batch_code} je sproščena.`); setListVersion(version => version + 1);
+        }} onRejected={result => {
+          setBatch(result); setActionError(""); setSuccess(`Šarža ${result.batch_code} je zavrnjena.`); setListVersion(version => version + 1);
         }} />}
       {user.role === "operator" && batch.status === "in_production" && (batch.operator_id === user.id
         ? <FinishBatch key={batch.id} batch={batch} onSaving={setSaving} onConflict={message => { setActionError(message); refresh(); }} onFinished={result => {
