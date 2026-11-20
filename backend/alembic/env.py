@@ -2,7 +2,6 @@
 from alembic import context
 
 from app.database import Base, engine
-import app.models  # registracija vseh modelov v Base.metadata
 
 
 target_metadata = Base.metadata
