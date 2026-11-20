@@ -4,7 +4,7 @@ from fractions import Fraction
 
 from fastapi import HTTPException
 from sqlalchemy import Date, cast, func, select
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Batch, BatchConsumption, BatchStatus, Material, MaterialLot, OrderStatus, ProductionLine, ProductionOrder, Recipe, RecipeItem, User
 from app.schemas.batches import BatchPreview, BatchStart, StockRequirement

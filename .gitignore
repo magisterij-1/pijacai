@@ -24,3 +24,8 @@ npm-debug.log*
 
 # Lokalni zapisi razvojnih nalog
 /m/
+
+# Coverage
+coverage.xml
+.coverage
+/frontend/coverage/
