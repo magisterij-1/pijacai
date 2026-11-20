@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.models import Batch, BatchConsumption, BatchStatus, MaterialLot, Role, Supplier
 # Skupna integracijska priprava z dejanskim FIFO zagonom; fixture uporablja inventory_db.
-from test_batches import auth, payload, start_path
+from test_batches import auth, batch_client, payload, start_path
 
 
 @pytest.fixture
